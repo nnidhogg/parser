@@ -1,0 +1,3 @@
+[submodule "external/lexer"]
+	path = external/lexer
+	url = https://github.com/nnidhogg/lexer.git
