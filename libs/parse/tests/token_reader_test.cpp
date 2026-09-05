@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <munch/core/builder.hpp>
 #include <munch/regex/regex.hpp>
+#include <stdexcept>
 #include <string>
 
 using namespace hopper::parse;
@@ -17,6 +18,7 @@ enum class Kind : uint8_t
     Number,
     Whitespace,
     Newline,
+    Semicolon,
 };
 
 bool skip_trivia(const Kind kind)
@@ -34,6 +36,7 @@ munch::core::Lexer build_lexer()
     builder.add_token(plus(any_of(Set::digits())), Kind::Number, 1);
     builder.add_token(plus(any_of(Set{' ', '\t'})), Kind::Whitespace, 1);
     builder.add_token(choice(text("\r\n"), text("\r"), text("\n")), Kind::Newline, 1);
+    builder.add_token(text(";"), Kind::Semicolon, 1);
 
     return builder.build();
 }
@@ -191,4 +194,55 @@ TEST(Token_reader_test, Location_starts_lines_after_a_newline)
 
     // Offsets index the original bytes: "one\r\n" is five of them, so "two" begins at offset 5.
     EXPECT_EQ(reader.location().offset(), 5U);
+}
+
+TEST(Token_reader_test, Recover_moves_to_the_next_certified_start_and_keeps_locations_right)
+{
+    // The dollar signs match no token. The first certificate past the failure is the window " t": a space cannot
+    // sit inside a word, so the t after it begins a token in every completely tokenizable context.
+    Token_reader<Kind> reader{build_lexer(), std::string{"one $\n$ two; three"}, skip_trivia};
+
+    EXPECT_EQ(reader.next().token().lexeme(), "one");
+    EXPECT_TRUE(reader.next().has_error());
+
+    const auto answer{reader.recover()};
+
+    ASSERT_TRUE(answer.has_value());
+    EXPECT_EQ(answer->start, 8U);
+    EXPECT_EQ(answer->evidence_begin, 7U);
+    EXPECT_TRUE(answer->window);
+    EXPECT_EQ(reader.span().begin.offset, 8U);
+    EXPECT_EQ(reader.span().end.offset, 8U);
+
+    EXPECT_EQ(reader.next().token().lexeme(), "two");
+    EXPECT_EQ(reader.span().begin.offset, 8U);
+    EXPECT_EQ(reader.span().begin.line, 2U);
+    EXPECT_EQ(reader.span().begin.column, 3U);
+    EXPECT_EQ(reader.next().token().kind(), Kind::Semicolon);
+    EXPECT_EQ(reader.next().token().lexeme(), "three");
+    EXPECT_TRUE(reader.next().end_of_input());
+}
+
+TEST(Token_reader_test, Recover_refuses_and_stays_put_when_nothing_ahead_is_certified)
+{
+    // Letters can sit inside a word, so nothing after the dollar sign certifies a token start.
+    Token_reader<Kind> reader{build_lexer(), std::string{"one $abc"}, skip_trivia};
+
+    EXPECT_EQ(reader.next().token().lexeme(), "one");
+    EXPECT_TRUE(reader.next().has_error());
+
+    const auto at{reader.span().end.offset};
+
+    EXPECT_FALSE(reader.recover().has_value());
+    EXPECT_TRUE(reader.next().has_error());
+    EXPECT_EQ(reader.span().end.offset, at);
+}
+
+TEST(Token_reader_test, Recover_refuses_to_run_with_a_token_buffered)
+{
+    Token_reader<Kind> reader{build_lexer(), std::string{"one two"}, skip_trivia};
+
+    EXPECT_EQ(reader.peek().token().lexeme(), "one");
+    EXPECT_THROW(static_cast<void>(reader.recover()), std::logic_error);
+    EXPECT_EQ(reader.next().token().lexeme(), "one");
 }

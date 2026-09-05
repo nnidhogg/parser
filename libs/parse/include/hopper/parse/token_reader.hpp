@@ -5,6 +5,7 @@
 #include <fstream>
 #include <munch/core/lexer.hpp>
 #include <munch/tools/tokenizer/tokenizer.hpp>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -96,6 +97,37 @@ public:
         tokenizer_.reset();
 
         lookahead_.reset();
+    }
+
+    /**
+     * @brief Move past a lexical error to the next position the lexer certifies as a token start.
+     *
+     * Call it only when the last read returned a lexical error, so the stream stands at the failure with nothing
+     * buffered; a buffered token means the caller is not at a lexical error, and the call throws rather than drop it.
+     * Munch's failure-anchored recovery, its contract inherited unchanged: the answer is a token start in every
+     * completely tokenizable repair of the text before the returned evidence, no repair is promised to exist, and
+     * the next read may error again. The skipped bytes advance the source location, so later spans stay right.
+     * When no certified start lies ahead the position does not move.
+     * @return The certified start with its evidence interval, or std::nullopt.
+     * @throws std::logic_error If a token is buffered, so the stream does not stand at a lexical error.
+     */
+    [[nodiscard]] std::optional<munch::core::Lexer::Certified_start> recover()
+    {
+        if (lookahead_.token())
+        {
+            throw std::logic_error{"Token_reader::recover() called with a token buffered, not at a lexical error"};
+        }
+
+        const auto before{tokenizer_.offset()};
+
+        const auto answer{tokenizer_.recover_from_failure()};
+
+        if (answer)
+        {
+            lookahead_.skip(tokenizer_.input().substr(before, answer->start - before));
+        }
+
+        return answer;
     }
 
     /**

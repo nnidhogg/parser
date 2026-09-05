@@ -19,8 +19,10 @@ front-ends.
 
 This parsing library is actively developed and not yet feature-complete. The core components are stable: **token
 streaming** with lookahead, **source tracking** (every AST node carries the span it was parsed from, with offsets
-indexing the original bytes on any platform's line endings), and **structured errors** (`parse::Parse_error` with a
-kind and the span it points at). Higher-level abstractions are still evolving.
+indexing the original bytes on any platform's line endings), **structured errors** (`parse::Parse_error` with a
+kind and the span it points at), and **certified recovery** (after a lexical error, `Parser_base::recover()` moves the
+stream to the next token start munch certifies, under munch's own contract, or refuses; what the parser does there is
+its own policy). Higher-level abstractions are still evolving.
 
 As the initial application of the library, work is underway on **`libs/cpp`**: a recursive-descent, precedence-climbing
 parser for a subset of C++ **expressions, statements, and translation units**. Literals cover integers (decimal,
@@ -48,7 +50,7 @@ Breaking changes may occur while the API is being refined.
 
 | Module        | Responsibility                                                                                          |
 |---------------|----------------------------------------------------------------------------------------------------------|
-| `hopper::parse` | The generic toolkit: `Token_reader` (one-token lookahead over a munch lexer, trivia skipping, newline normalization, line/column tracking) and `Parser_base` (the LL(1) primitives: `peek`, `check`, `accept`, `expect`, structured errors). |
+| `hopper::parse` | The generic toolkit: `Token_reader` (one-token lookahead over a munch lexer, trivia skipping, newline normalization, line/column tracking) and `Parser_base` (the LL(1) primitives: `peek`, `check`, `accept`, `expect`, structured errors, and `recover`, munch's certified resynchronization after a lexical error). |
 | `hopper::cpp`   | The C++ front end built on the toolkit: a munch token set, plain-struct variant ASTs (`ast::Expr`, `ast::Stmt`, `ast::Translation_unit`), and a `Parser` with one implementation file per grammar area. |
 
 The split mirrors the library's purpose: everything a recursive-descent parser needs regardless of language lives in

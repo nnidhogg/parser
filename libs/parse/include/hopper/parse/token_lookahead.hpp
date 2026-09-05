@@ -100,6 +100,18 @@ public:
         cursor_.advance(lexeme);
     }
 
+    /**
+     * @brief Advance the source location over bytes skipped without a token; the span then stands empty there.
+     */
+    void skip(const std::string_view bytes) noexcept
+    {
+        token_.reset();
+
+        cursor_.advance(bytes);
+
+        begin_ = cursor_;
+    }
+
 private:
     std::optional<Token_t> token_;
 

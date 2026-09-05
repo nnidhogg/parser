@@ -2,6 +2,7 @@
 #define HOPPER_LIBS_PARSE_INCLUDE_HOPPER_PARSE_PARSER_BASE_HPP
 
 #include <filesystem>
+#include <munch/core/lexer.hpp>
 #include <munch/tools/tokenizer/token.hpp>
 #include <optional>
 #include <string>
@@ -199,6 +200,19 @@ protected:
 
         throw Parse_error{Parse_error_kind::Lexical, {at, at}, "Lexical error: " + message};
     }
+
+    /**
+     * @brief Move the stream past a lexical error to the lexer's next certified token start, or refuse.
+     *
+     * Call it after catching the Parse_error that next_token() or peek_token() threw for a lexical error; the
+     * stream then stands at the failure with nothing buffered. After a syntax error a token is buffered and the call
+     * throws, since skipping from there is the parser's own policy, not a certified resynchronization. The lexical
+     * contract is munch's, inherited unchanged; what the parser does at the resumed position is the derived parser's
+     * policy. std::nullopt means no certified start lies ahead and the position did not move.
+     * @return The certified start with its evidence interval, or std::nullopt.
+     * @throws std::logic_error If a token is buffered.
+     */
+    [[nodiscard]] std::optional<munch::core::Lexer::Certified_start> recover() { return reader_.recover(); }
 
 private:
     Token_reader<Kind> reader_;

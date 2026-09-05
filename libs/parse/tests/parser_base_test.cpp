@@ -20,6 +20,7 @@ enum class Kind : uint8_t
     Word,
     Number,
     Whitespace,
+    Semicolon,
 };
 
 bool skip_trivia(const Kind kind)
@@ -36,6 +37,7 @@ munch::core::Lexer build_lexer()
     builder.add_token(plus(any_of(Set::alpha())), Kind::Word, 1);
     builder.add_token(plus(any_of(Set::digits())), Kind::Number, 1);
     builder.add_token(plus(any_of(Set{' '})), Kind::Whitespace, 1);
+    builder.add_token(text(";"), Kind::Semicolon, 1);
 
     return builder.build();
 }
@@ -54,6 +56,7 @@ public:
     using Parser_base::expect;
     using Parser_base::next_token;
     using Parser_base::peek_token;
+    using Parser_base::recover;
 };
 
 } // namespace
@@ -173,4 +176,29 @@ TEST(Parser_base_test, Lexical_errors_point_at_the_rejected_input)
         EXPECT_EQ(error.kind(), Parse_error_kind::Lexical);
         EXPECT_EQ(error.span().begin.offset, 3U);
     }
+}
+
+TEST(Parser_base_test, Recover_resumes_at_the_certified_start_after_a_lexical_error)
+{
+    Test_parser parser{"one $$ ; two"};
+
+    EXPECT_EQ(parser.expect(Kind::Word, "a word").lexeme(), "one");
+
+    try
+    {
+        static_cast<void>(parser.peek_token());
+        FAIL() << "peek_token() should have thrown";
+    }
+    catch (const Parse_error& error)
+    {
+        EXPECT_EQ(error.kind(), Parse_error_kind::Lexical);
+    }
+
+    const auto answer{parser.recover()};
+
+    ASSERT_TRUE(answer.has_value());
+    EXPECT_EQ(answer->start, 7U);
+    EXPECT_EQ(parser.expect(Kind::Semicolon, "a semicolon").lexeme(), ";");
+    EXPECT_EQ(parser.expect(Kind::Word, "a word").lexeme(), "two");
+    EXPECT_FALSE(parser.peek_token().has_value());
 }
