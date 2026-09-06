@@ -6,95 +6,244 @@
   <img src="https://github.com/nnidhogg/hopper/actions/workflows/codeql.yml/badge.svg" alt="CodeQL">
   <img src="https://codecov.io/gh/nnidhogg/hopper/branch/master/graph/badge.svg" alt="Coverage">
   <img src="https://img.shields.io/github/license/nnidhogg/hopper" alt="License">
-  <img src="https://img.shields.io/github/v/release/nnidhogg/hopper?include_prereleases&sort=semver" alt="Release">
 </p>
 
-`hopper` is a **lightweight C++23 library** for building **recursive-descent parsers**. It works seamlessly with the
-**[`munch`](https://github.com/nnidhogg/munch)** project and provides a **token stream with lookahead**, **source
-tracking**, and **error reporting**. The design focuses on **clarity**, **deterministic control flow**, and a small,
-predictable API, making it easy to implement **LL(1)-style grammars** for DSLs, configuration formats, or full language
-front-ends.
+`hopper` is a **C++23 library** for building **recursive-descent parsers** on top of
+**[`munch`](https://github.com/nnidhogg/munch)** lexers. It supplies the parts every hand-written parser repeats and
+nothing else: a **token stream with one token of lookahead** that discards trivia, **source tracking** so every node
+carries the span it was parsed from with offsets indexing the original bytes, **structured errors** with a kind and
+the span they point at, and **certified recovery** after a lexical error, inherited from munch under munch's own
+contract. A grammar is a class that derives from the kit and writes its productions as methods; there is no grammar
+language, no generated code and no runtime table.
 
-## **Status: Work in Progress**
+Two grammars ship on the kit. **JSON**, complete to RFC 8259 and held to every accepted and rejected case of the
+JSONTestSuite, parsed with an explicit stack so nesting depth is bounded by memory and not by the call stack. And the
+**C-like study grammar**, the token set the certified-recovery campaign is measured over, with a parser that reads
+keywords and multi-byte operators out of the campaign's coarse tokens the way a C lexer would have, so a parser over
+the measured grammar exists beside the measurements.
 
-This parsing library is actively developed and not yet feature-complete. The core components are stable: **token
-streaming** with lookahead, **source tracking** (every AST node carries the span it was parsed from, with offsets
-indexing the original bytes on any platform's line endings), **structured errors** (`parse::Parse_error` with a
-kind and the span it points at), and **certified recovery** (after a lexical error, `Parser_base::recover()` moves the
-stream to the next token start munch certifies, under munch's own contract, or refuses; what the parser does there is
-its own policy). Higher-level abstractions are still evolving.
+## **Status: pre-1.0**
 
-As the initial application of the library, work is underway on **`libs/cpp`**: a recursive-descent, precedence-climbing
-parser for a subset of C++ **expressions, statements, and translation units**. Literals cover integers (decimal,
-hexadecimal, binary), floating point, booleans, strings with escape sequences, and characters; line and block comments
-are recognized and discarded as trivia. Expressions cover literals, identifiers, parenthesized
-subexpressions, unary operators (`+`, `-`, `!`, `~`, prefix `++`/`--`, address-of `&`, dereference `*`), postfix
-operators (calls, `.`, `->`, `[]`, `++`, `--`), the
-standard left-associative binary precedence ladder (multiplicative, additive, shift, relational, equality, bitwise-and,
-bitwise-xor, bitwise-or, logical-and, logical-or), and the right-associative ternary conditional and assignment
-(plain `=` and the compound arithmetic/bitwise operators). Statements cover the expression statement, the empty
-statement, compound `{}` blocks, `if`/`else` with the dangling `else` binding to the nearest `if`, `while`, `for`
-with a declaration, expression, or empty init-statement, `do`/`while`, `return`, and declarations: a possibly
-const-qualified fundamental type followed by comma-separated pointer/reference declarators with optional
-initializers. Translation units parse as a sequence of function definitions, function prototypes, and variable
-declarations, with parameters carrying the same type and declarator shapes plus optional defaults. Expressions also
-cover the four named casts (`static_cast<const char**&>(value)` and friends) over the same type shapes declarations
-use. A realistic source file exercising the whole subset parses end to end in the test suite. Raw strings, numeric
-suffixes, and digit separators are not covered yet.
+The kit is stable in shape and used by both grammars; the public names may still change before 1.0, after which the
+versioning rule is munch's, additive within a major version. What is not here yet is the parser-level half of
+certified resumption: after a lexical error the kit moves the stream to munch's next certified token start, and what
+a parser may assume about its own state at that point is the open question the JSON grammar was chosen to ask; see
+[docs/design.md](docs/design.md).
 
-This serves as both a **reference implementation** and a **validation** of the library's design and usability.
+## **Features**
 
-Breaking changes may occur while the API is being refined.
+- **A token reader over any munch lexer.** `parse::Token_reader<Kind>` wraps a `munch::core::Lexer` with one token
+  of lookahead, a skip predicate for trivia, and locations that count `"\r\n"` and a lone `'\r'` as one newline each
+  while offsets index the original bytes.
+- **A parser base with the operations a recursive-descent parser repeats.** `parse::Parser_base<Kind>` gives peek,
+  check, accept and expect over token kinds, `mark()` and `span_from()` to close a node's span, and three error
+  raisers whose messages name what was expected.
+- **Structured errors.** `parse::Parse_error` carries a kind, lexical, an unexpected token, an unexpected end, or an
+  invalid literal, and the source span it points at, with line, column and byte offset.
+- **Certified recovery.** `Parser_base::recover()` moves the stream past a lexical error to the next token start
+  munch certifies, under complete-repair invariance: in every completely tokenizable repair of the text before the
+  returned evidence, the answer begins a token. No repair is promised to exist, the next read may error again, and a
+  call with a token buffered throws rather than drop it.
+- **JSON.** `json::Parser` parses one RFC 8259 text into a `json::Value` tree: null, booleans, numbers kept as
+  spelled with a conversion to double on request, strings unescaped to UTF-8 with surrogate pairs combined, arrays,
+  and objects that keep members in document order with duplicates and answer a lookup with the last member of a
+  name. The lexer's string interior is built from munch's UTF-8 code point ranges, so a string that is not
+  well-formed UTF-8 never tokenizes.
+- **The C-like study grammar.** `clike::Parser` parses expressions, statements and translation units over the
+  campaign's seven token kinds: decimal integers, strings without escapes, booleans, the C operator ladder with
+  assignment and the ternary, calls, subscripts, member access, the four named casts, the fundamental types with
+  `const`, pointers and references, and `if`, `while`, `for`, `do`, `return`, blocks and declarations.
 
 ## **Architecture Overview**
 
-| Module        | Responsibility                                                                                          |
-|---------------|----------------------------------------------------------------------------------------------------------|
-| `hopper::parse` | The generic toolkit: `Token_reader` (one-token lookahead over a munch lexer, trivia skipping, newline normalization, line/column tracking) and `Parser_base` (the LL(1) primitives: `peek`, `check`, `accept`, `expect`, structured errors, and `recover`, munch's certified resynchronization after a lexical error). |
-| `hopper::cpp`   | The C++ front end built on the toolkit: a munch token set, plain-struct variant ASTs (`ast::Expr`, `ast::Stmt`, `ast::Translation_unit`), and a `Parser` with one implementation file per grammar area. |
+```
+munch::core::Lexer            the automaton; every token hopper sees comes from here
+        |
+parse::Token_reader<Kind>     one-token lookahead, trivia discarded, locations tracked
+        |
+parse::Parser_base<Kind>      peek / accept / expect, spans, errors, recover()
+        |
+json::Parser   clike::Parser  the grammars, each a class of productions
+        |
+json::Value    clike::ast     the trees, every node with its span
+```
 
-The split mirrors the library's purpose: everything a recursive-descent parser needs regardless of language lives in
-`libs/parse`, and everything specific to the C++ subset lives in `libs/cpp` as the reference consumer. A new language
-front end starts from `Token_reader` and `Parser_base` and brings only its token set, its AST, and its grammar
-functions.
+## **Usage Overview**
 
-## **Usage**
+### **Parsing JSON**
 
 ```cpp
-#include <hopper/cpp/lexer.hpp>
-#include <hopper/cpp/parser.hpp>
+#include <iostream>
+#include <string>
 
-using namespace hopper::cpp;
+#include <hopper/json/parser.hpp>
+#include <hopper/parse/parse_error.hpp>
 
-Parser parser{build_lexer(), std::string{"int add(int a, int b) { return a + b; }"}};
+int main()
+{
+    const std::string text{R"({"name": "hopper", "tags": ["json", "clike"], "stable": false})"};
 
-const auto unit{parser.parse_translation_unit()};
+    try
+    {
+        hopper::json::Parser parser{text};
 
-// unit.items holds one ast::Function; walk the variant ASTs with std::visit.
+        const auto document{parser.parse()};
+
+        const auto& object{document.as_object()};
+
+        std::cout << object.find("name")->as_string() << " has "
+                  << object.find("tags")->as_array().elements.size() << " tags\n";
+
+        // Every value knows where it came from: byte offsets into the original text, and a line and column.
+        const auto& stable{*object.find("stable")};
+
+        std::cout << "stable spans bytes " << stable.span.begin.offset << " to " << stable.span.end.offset << '\n';
+    }
+    catch (const hopper::parse::Parse_error& error)
+    {
+        std::cerr << error.what() << " at " << error.span().begin.line << ':' << error.span().begin.column << '\n';
+    }
+}
 ```
 
-`Parser` also accepts a `std::filesystem::path` to parse a file, and exposes `parse_expression()` and
-`parse_statement()` for smaller entry points. All three throw `std::runtime_error` with a position-bearing message on
-lexical or syntax errors.
+`parse()` accepts exactly one JSON text with nothing but whitespace around it, and raises a `Parse_error` whose kind
+says what went wrong: `Lexical` for bytes no token covers, a control character inside a string or an ill-formed UTF-8
+sequence; `Unexpected_token` for a token out of place, trailing text included; `Unexpected_end` for an input that
+ends inside a value; `Invalid_literal` for a `\u` escape that leaves a surrogate unpaired. Numbers are kept as the
+document spelled them; `Number::to_double()` gives the nearest double, an infinity past the double range.
 
-## **Building and Testing**
+### **Parsing the C-like grammar**
+
+```cpp
+#include <hopper/clike/parser.hpp>
+
+hopper::clike::Parser parser{std::string{"int total = (a << 2) + b[i] * -c;"}};
+
+const auto statement{parser.parse_statement()};
+```
+
+`parse_expression()`, `parse_statement()` and `parse_translation_unit()` each parse the whole input as one construct
+and refuse anything left over. The trees are plain structs under `hopper::clike::ast`, one `std::variant` per node
+family, each node carrying its span.
+
+### **Writing a grammar on the kit**
+
+A parser derives from `parse::Parser_base<Kind>` over its own token kind, builds a `parse::Token_reader<Kind>` from a
+munch lexer and a trivia predicate, and writes its productions as methods:
+
+```cpp
+class Parser : public hopper::parse::Parser_base<Token_kind>
+{
+public:
+    explicit Parser(const std::string& input)
+        : Parser_base{hopper::parse::Token_reader<Token_kind>{lexer(), input, is_trivia}}
+    {}
+
+    Node parse_pair()
+    {
+        const auto begin{mark()};                     // where this node starts
+        const auto key{expect(Token_kind::Name, "a name")};
+        expect(Token_kind::Equals, "'=' after the name");
+        const auto value{expect(Token_kind::Number, "a value")};
+        return {.key = key.lexeme(), .value = value.lexeme(), .span = span_from(begin)};
+    }
+};
+```
+
+The base's `check(kind)`, `accept(kind)` and `expect(kind, what)` look at the next token; `syntax_error(message,
+token)`, `eof_error(message)` and `lexical_error(message)` raise the three error kinds with the right span. Both
+shipped grammars are written this way and are the reference for the style.
+
+### **Error Recovery**
+
+After a `Parse_error` of kind `Lexical`, the stream stands at the failing byte with nothing buffered, and
+`recover()` asks munch for the next certified token start:
+
+```cpp
+try
+{
+    document = parser.parse();
+}
+catch (const hopper::parse::Parse_error& error)
+{
+    if (error.kind() == hopper::parse::Parse_error_kind::Lexical)
+    {
+        if (const auto start{parser.recover()})
+        {
+            // The stream now stands at start->start, a token start in every completely tokenizable repair of the
+            // text before start->evidence_begin; what to parse from here is the grammar's decision.
+        }
+    }
+}
+```
+
+The answer is munch's `Certified_start`, position and evidence interval, and the guarantee is exactly munch's; hopper
+adds the location bookkeeping so spans after the skip stay right, and refuses the call when a token is buffered.
+
+## **Getting Started**
+
+### **Requirements**
+
+- A C++23 compiler; GCC and Clang on Linux are the toolchains built and tested (GCC 13.3 and Clang 19 in CI), on
+  x86-64 and 64-bit ARM. Clang 18 and older cannot compile munch's tokenizer, which every hopper parser reads through.
+- CMake 3.20+.
+- munch as the git submodule under `external/munch`, checked out at the release hopper builds against; googletest
+  beside it for the tests. Everything else is the standard library.
+
+### **Building the Project**
 
 ```bash
-git clone --recurse-submodules https://github.com/nnidhogg/hopper.git
-cmake -S hopper -B hopper/build
-cmake --build hopper/build -j 8
-cd hopper/build && ctest --output-on-failure
+git clone --recurse-submodules https://github.com/nnidhogg/hopper
+cd hopper
+cmake -S . -B build
+cmake --build build -j 8
 ```
 
-munch is vendored as a submodule under `external/munch`; everything else (googletest) is fetched by CMake. Every
-library has its own test suite, registered with CTest, and CI builds with GCC and Clang 19, enforces clang-format 19,
-and reports coverage.
+The default `CMAKE_BUILD_TYPE` is `Release` when unset.
+
+## **Testing**
+
+Each library under `libs/` has a GoogleTest suite in a `tests/` subdirectory, registered with CTest:
+
+```bash
+cd build
+ctest --output-on-failure
+```
+
+The JSON suite includes the 318 parsing cases of the JSONTestSuite, vendored under
+`libs/json/tests/data/JSONTestSuite/` with their licence and provenance: every `y_` case must parse, every `n_` case
+must be refused, and what the parser does on the `i_` cases is asserted rather than left to drift. Tests and
+warnings-as-errors are enabled by default only when hopper is the top-level project; a build consuming hopper through
+`add_subdirectory` opts in with `-DHOPPER_BUILD_TESTS=ON` or `-DHOPPER_WERROR=ON`.
+
+## **Directory Structure**
+
+```
+docs/                     design.md, the decisions behind the kit and the two grammars.
+libs/
+  parse/                  The kit: Token_reader, Token_lookahead, Token_location, Source_span, Parse_error,
+                          Parser_base.
+  json/                   The JSON grammar: tokens over munch, the explicit-stack Parser, the Value tree; the
+                          conformance suite under tests/data.
+  clike/                  The C-like study grammar: the campaign's tokens, the Parser with its operator fusion, the
+                          ast structs.
+external/
+  munch/                  The lexer library, as a submodule pinned to a release.
+  googletest/             The test framework.
+```
+
+## **Example CMake Integration**
+
+```cmake
+add_subdirectory(external/hopper)
+
+target_link_libraries(your_target PRIVATE hopper::json)   # or hopper::clike, or hopper::parse for the kit alone
+```
+
+`hopper::hopper` carries all three. With `-DHOPPER_INSTALL=ON` the libraries, headers and a package config install
+under the usual prefix, and a consumer with munch installed beside them writes `find_package(hopper)` instead.
 
 ## **License**
 
-This project is licensed under the terms of the MIT License. See the [LICENSE](LICENSE) file for details.
-
-## **Author**
-
-Developed and maintained by **Nicklas Nidhögg**  
-GitHub: [nnidhogg](https://github.com/nnidhogg)
+MIT, see [LICENSE](LICENSE). The vendored JSONTestSuite cases are MIT as well; their notice is in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

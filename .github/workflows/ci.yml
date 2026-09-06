@@ -41,6 +41,7 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
+          # Clang 19 is the first version that can compile munch's tokenizer, which every hopper parser reads through.
           sudo apt-get install -y clang-19 ninja-build
 
       - name: Check Clang version
@@ -54,6 +55,80 @@ jobs:
           mkdir build
           cd build
           cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build with CMake
+        run: |
+          cd build
+          cmake --build .
+
+      - name: Run tests with CTest
+        run: |
+          cd build
+          ctest --output-on-failure
+
+  build-and-test-arm:
+    runs-on: ubuntu-24.04-arm
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build
+
+      - name: Configure build with CMake
+        # Plain char is unsigned here, the opposite of the x86-64 jobs; the parsers read bytes through munch's
+        # carrier convention and nothing may depend on the carrier's signedness.
+        run: |
+          mkdir build
+          cd build
+          cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build with CMake
+        run: |
+          cd build
+          cmake --build .
+
+      - name: Run tests with CTest
+        run: |
+          cd build
+          ctest --output-on-failure
+
+  sanitize:
+    runs-on: ubuntu-24.04
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-19 ninja-build
+
+      - name: Configure build with CMake
+        # Address and undefined-behavior sanitizers watch the parsers' stacks and the value trees; the deep-nesting
+        # tests are the ones that make them earn their run.
+        env:
+          CC: clang-19
+          CXX: clang++-19
+        run: |
+          mkdir build
+          cd build
+          cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Debug \
+                -DCMAKE_CXX_FLAGS="-fsanitize=address,undefined -fno-sanitize-recover=all"
 
       - name: Build with CMake
         run: |
@@ -101,7 +176,8 @@ jobs:
         run: |
           mkdir build
           cd build
-          cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS="--coverage -fprofile-abs-path"
+          cmake -G Ninja .. -DCMAKE_BUILD_TYPE=Debug \
+                -DCMAKE_CXX_FLAGS="--coverage -fprofile-abs-path -fprofile-update=atomic"
 
       - name: Build with CMake
         run: |
@@ -116,19 +192,20 @@ jobs:
       - name: Generate code coverage report
         run: |
           cd build
-          gcovr --root .. --gcov-executable gcov --xml-pretty --output coverage.xml \
-                --exclude '.*/external/.*' \
-                --exclude '.*/googletest/.*' \
-                --exclude '.*/tests/.*'
-          gcovr --root .. --gcov-executable gcov --html --html-details --output coverage.html \
-                --exclude '.*/external/.*' \
-                --exclude '.*/googletest/.*' \
-                --exclude '.*/tests/.*'
-          gcovr --root .. --gcov-executable gcov --txt-metric branch \
-                --exclude '.*/external/.*' \
-                --exclude '.*/googletest/.*' \
-                --exclude '.*/tests/.*' \
-                --print-summary
+
+          # Each pattern is unanchored on both ends: gcovr matches --exclude against a path that may or may not
+          # have a leading directory component, so a pattern requiring a literal leading "/" silently fails to
+          # match the no-prefix case.
+          EXCLUDES=(
+            --exclude '(.*/)?external/.*'
+            --exclude '(.*/)?_deps/.*'
+            --exclude '(.*/)?tests/.*'
+            --exclude '(.*/)?CMakeFiles/.*'
+          )
+
+          gcovr --root .. --gcov-executable gcov --xml-pretty --output coverage.xml "${EXCLUDES[@]}"
+          gcovr --root .. --gcov-executable gcov --html --html-details --output coverage.html "${EXCLUDES[@]}"
+          gcovr --root .. --gcov-executable gcov --txt-metric branch --print-summary "${EXCLUDES[@]}"
 
       - name: Upload coverage reports to Codecov
         uses: codecov/codecov-action@v5
@@ -137,3 +214,69 @@ jobs:
           flags: unittests
           fail_ci_if_error: true
           token: ${{ secrets.CODECOV_TOKEN }}
+
+  install-consumer:
+    runs-on: ubuntu-24.04
+
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code with submodules
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build
+
+      - name: Install munch from the submodule
+        run: |
+          cmake -G Ninja -S external/munch -B build-munch -DCMAKE_BUILD_TYPE=Release \
+                -DMUNCH_BUILD_TESTS=OFF -DMUNCH_BUILD_BENCHMARK=OFF -DMUNCH_INSTALL=ON \
+                -DCMAKE_INSTALL_PREFIX="$PWD/prefix"
+          cmake --build build-munch
+          cmake --install build-munch
+
+      - name: Install hopper against it
+        run: |
+          cmake -G Ninja -S . -B build-hopper -DCMAKE_BUILD_TYPE=Release \
+                -DHOPPER_SYSTEM_MUNCH=ON -DHOPPER_INSTALL=ON -DHOPPER_BUILD_TESTS=OFF \
+                -DCMAKE_PREFIX_PATH="$PWD/prefix" -DCMAKE_INSTALL_PREFIX="$PWD/prefix"
+          cmake --build build-hopper
+          cmake --install build-hopper
+
+      - name: Build a consumer with find_package
+        # The consumer knows nothing of either tree: it finds hopper by its package config, which finds munch by its
+        # own.
+        run: |
+          mkdir consumer
+          cat > consumer/CMakeLists.txt << 'CMAKE'
+          cmake_minimum_required(VERSION 3.20)
+          project(consumer LANGUAGES CXX)
+          set(CMAKE_CXX_STANDARD 23)
+          find_package(hopper REQUIRED)
+          add_executable(consumer main.cpp)
+          target_link_libraries(consumer PRIVATE hopper::json hopper::clike)
+          CMAKE
+          cat > consumer/main.cpp << 'CPP'
+          #include <cstdio>
+          #include <string>
+          #include <hopper/clike/parser.hpp>
+          #include <hopper/json/parser.hpp>
+          int main()
+          {
+              hopper::json::Parser json{std::string{"[1, {\"k\": \"v\"}]"}};
+              const auto value{json.parse()};
+              hopper::clike::Parser clike{std::string{"a <<= b + 1;"}};
+              const auto statement{clike.parse_statement()};
+              std::printf("%zu elements, statement bytes %zu to %zu\n", value.as_array().elements.size(),
+                          statement.span.begin.offset, statement.span.end.offset);
+              return value.as_array().elements.size() == 2 && statement.span.end.offset == 12 ? 0 : 1;
+          }
+          CPP
+          cmake -G Ninja -S consumer -B build-consumer -DCMAKE_PREFIX_PATH="$PWD/prefix"
+          cmake --build build-consumer
+          ./build-consumer/consumer
