@@ -37,6 +37,25 @@ if (HOPPER_BUILD_TESTS)
     enable_testing()
 endif ()
 
+include(GNUInstallDirs)
+
+# Installing hopper means installing targets that link munch, and an exported target can only refer to munch as an
+# installed package, so the install rules require the system munch; the default build uses the submodule and does not
+# install.
+option(HOPPER_SYSTEM_MUNCH "Use an installed munch found with find_package instead of the submodule" OFF)
+option(HOPPER_INSTALL "Generate install rules for hopper (requires HOPPER_SYSTEM_MUNCH)" OFF)
+
+if (HOPPER_INSTALL AND NOT HOPPER_SYSTEM_MUNCH)
+    message(FATAL_ERROR
+            "HOPPER_INSTALL needs HOPPER_SYSTEM_MUNCH=ON: the exported targets refer to munch's installed package")
+endif ()
+
+# Found here rather than under external/, because imported targets are visible only from the directory that finds
+# them downward, and every library under libs/ links munch.
+if (HOPPER_SYSTEM_MUNCH)
+    find_package(munch REQUIRED)
+endif ()
+
 add_subdirectory(external)
 add_subdirectory(libs)
 
@@ -57,3 +76,36 @@ target_link_libraries(${PROJECT_NAME}
         hopper_clike
 )
 
+if (HOPPER_INSTALL)
+    # The installed names are the aliases the build offers: hopper::parse, hopper::json, hopper::clike, hopper::hopper.
+    set_target_properties(hopper_parse PROPERTIES EXPORT_NAME parse)
+    set_target_properties(hopper_json PROPERTIES EXPORT_NAME json)
+    set_target_properties(hopper_clike PROPERTIES EXPORT_NAME clike)
+
+    install(TARGETS ${PROJECT_NAME} hopper_parse hopper_json hopper_clike EXPORT hopper_targets)
+
+    install(DIRECTORY libs/parse/include/ libs/json/include/ libs/clike/include/
+            DESTINATION ${CMAKE_INSTALL_INCLUDEDIR})
+
+    # The JSONTestSuite notice accompanies copies of the test data, which the install does not carry; the notice
+    # travels anyway so the package's licences are complete on their own.
+    install(FILES LICENSE THIRD_PARTY_NOTICES.md DESTINATION ${CMAKE_INSTALL_DATADIR}/licenses/hopper)
+
+    install(EXPORT hopper_targets
+            FILE hopper-targets.cmake
+            NAMESPACE hopper::
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/hopper
+    )
+
+    include(CMakePackageConfigHelpers)
+
+    write_basic_package_version_file(${CMAKE_CURRENT_BINARY_DIR}/hopper-config-version.cmake
+            COMPATIBILITY SameMajorVersion
+    )
+
+    install(FILES
+            cmake/hopper-config.cmake
+            ${CMAKE_CURRENT_BINARY_DIR}/hopper-config-version.cmake
+            DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/hopper
+    )
+endif ()

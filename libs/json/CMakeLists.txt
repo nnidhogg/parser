@@ -2,22 +2,26 @@ cmake_minimum_required(VERSION 3.20)
 cmake_policy(SET CMP0097 NEW)
 project(hopper_json)
 
+include(GNUInstallDirs)
+
 add_library(${PROJECT_NAME}
         src/lexer.cpp
         src/parser.cpp
         src/value.cpp
 )
 
+# The build reads the headers from the tree; an installed consumer reads them from the prefix's include directory.
 target_include_directories(${PROJECT_NAME}
         PUBLIC
-        include
+        $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+        $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
 )
 
 target_link_libraries(${PROJECT_NAME}
         PUBLIC
         hopper_parse
         PRIVATE
-        munch
+        munch::munch
 )
 
 if (HOPPER_BUILD_TESTS)
@@ -29,7 +33,7 @@ if (HOPPER_BUILD_TESTS)
     target_link_libraries(${PROJECT_NAME}_tests
             PRIVATE
             ${PROJECT_NAME}
-            munch
+            munch::munch
             gtest_main
     )
 

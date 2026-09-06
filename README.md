@@ -240,8 +240,10 @@ add_subdirectory(external/hopper)
 target_link_libraries(your_target PRIVATE hopper::json)   # or hopper::clike, or hopper::parse for the kit alone
 ```
 
-`hopper::hopper` carries all three. With `-DHOPPER_INSTALL=ON` the libraries, headers and a package config install
-under the usual prefix, and a consumer with munch installed beside them writes `find_package(hopper)` instead.
+`hopper::hopper` carries all three. To install hopper, build it against an installed munch rather than the submodule,
+`-DHOPPER_SYSTEM_MUNCH=ON -DHOPPER_INSTALL=ON`, so the exported targets refer to munch's own installed package; the
+libraries, headers and a package config then install under the usual prefix, and a consumer writes
+`find_package(hopper)` and links the same `hopper::` names.
 
 ## **License**
 
