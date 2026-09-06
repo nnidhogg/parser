@@ -47,10 +47,12 @@ add_library(${PROJECT_NAME}
 
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 add_library(${PROJECT_NAME}::parse ALIAS hopper_parse)
+add_library(${PROJECT_NAME}::json ALIAS hopper_json)
 add_library(${PROJECT_NAME}::cpp ALIAS hopper_cpp)
 
 target_link_libraries(${PROJECT_NAME}
         INTERFACE
         hopper_parse
+        hopper_json
         hopper_cpp
 )

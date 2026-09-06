@@ -9,13 +9,15 @@
 namespace hopper::parse
 {
 /**
- * @brief What went wrong: the input failed to tokenize, a token was not the expected one, or the input ended.
+ * @brief What went wrong: the input failed to tokenize, a token was not the expected one, the input ended, or a
+ *        token the grammar admits spells a value the language rejects, such as a lone surrogate escape.
  */
 enum class Parse_error_kind
 {
     Lexical,
     Unexpected_token,
     Unexpected_end,
+    Invalid_literal,
 };
 
 /**
