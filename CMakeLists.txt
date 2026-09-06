@@ -1,17 +1,20 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.20.6)
 project(hopper VERSION 0.1.0 LANGUAGES CXX)
 
-if (NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release)
-endif ()
-
-set(CMAKE_CXX_STANDARD 23)
 
 if (CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
     set(HOPPER_IS_TOP_LEVEL ON)
 else ()
     set(HOPPER_IS_TOP_LEVEL OFF)
 endif ()
+
+# The default build type is hopper's own choice only when it is the top-level project; a parent keeps its own.
+if (HOPPER_IS_TOP_LEVEL AND NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release)
+endif ()
+
+set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # hopper's own root for test data paths; CMAKE_SOURCE_DIR names the embedding project's root under add_subdirectory().
 set(HOPPER_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}")

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.20.6)
 cmake_policy(SET CMP0097 NEW)
 project(hopper_json)
 
@@ -9,6 +9,9 @@ add_library(${PROJECT_NAME}
         src/parser.cpp
         src/value.cpp
 )
+
+# The exported target carries the standard it needs.
+target_compile_features(${PROJECT_NAME} PUBLIC cxx_std_23)
 
 # The build reads the headers from the tree; an installed consumer reads them from the prefix's include directory.
 target_include_directories(${PROJECT_NAME}

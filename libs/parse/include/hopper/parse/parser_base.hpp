@@ -34,15 +34,17 @@ public:
 
 protected:
     /**
-     * @brief Construct the base around an existing token stream.
+     * @brief Constructs the base around a token stream.
+     * @param reader The stream the grammar reads.
      */
     explicit Parser_base(Token_reader<Kind> reader) : reader_{std::move(reader)} {}
 
     ~Parser_base() = default;
 
     /**
-     * @brief Retrieve the next token, throwing on a lexical error.
+     * @brief Consumes the next token.
      * @return The token, or std::nullopt at end of input.
+     * @throws Parse_error With kind Lexical when the lexer rejects the input.
      */
     [[nodiscard]] std::optional<Token_t> next_token()
     {
@@ -62,8 +64,9 @@ protected:
     }
 
     /**
-     * @brief Look at the next token without consuming it, throwing on a lexical error.
+     * @brief Looks at the next token without consuming it.
      * @return The token, or std::nullopt at end of input.
+     * @throws Parse_error With kind Lexical when the lexer rejects the input.
      */
     [[nodiscard]] std::optional<Token_t> peek_token()
     {
@@ -83,7 +86,9 @@ protected:
     }
 
     /**
-     * @brief Check whether the next token has the given kind, without consuming it.
+     * @brief Whether the next token has a kind, without consuming it.
+     * @param kind The kind asked for.
+     * @return True when the next token has it.
      */
     [[nodiscard]] bool check(const Kind kind)
     {
@@ -93,7 +98,9 @@ protected:
     }
 
     /**
-     * @brief Consume and return the next token if it has the given kind.
+     * @brief Consumes the next token if it has a kind.
+     * @param kind The kind asked for.
+     * @return The token, or std::nullopt when the next token has another kind or the input has ended.
      */
     [[nodiscard]] std::optional<Token_t> accept(const Kind kind)
     {
@@ -106,10 +113,12 @@ protected:
     }
 
     /**
-     * @brief Require the next token to have the given kind, consuming it.
-     * @param kind The required token kind.
-     * @param what A human-readable description of what was expected, used in the error message.
-     * @throws std::runtime_error If the next token has a different kind, or the input ends first.
+     * @brief Consumes the next token, which must have a kind.
+     * @param kind The required kind.
+     * @param what What the grammar expected, named in the error.
+     * @return The token.
+     * @throws Parse_error With kind Unexpected_token when the next token has another kind, Unexpected_end when the
+     *         input has ended.
      */
     Token_t expect(const Kind kind, const std::string_view what)
     {
@@ -129,26 +138,28 @@ protected:
     }
 
     /**
-     * @brief Replace the input and rewind, so one parser and its compiled lexer serve many inputs in sequence.
-     *
-     * Previously returned ASTs stay valid: they own their strings rather than viewing the reader's buffer.
+     * @brief Replaces the input and rewinds, so one parser and its compiled lexer serve many inputs in sequence.
+     * @param input The new text.
      */
     void load(const std::string& input) { reader_.load(input); }
 
     /**
-     * @brief Replace the input with a file's contents and rewind.
+     * @brief Replaces the input with a file's contents and rewinds.
+     * @param file The file to read.
      */
     void load(const std::filesystem::path& file) { reader_.load(file); }
 
     /**
-     * @brief Rewind to the beginning of the current input.
+     * @brief Rewinds to the beginning of the current input.
      */
     void reset() noexcept { reader_.reset(); }
 
     /**
-     * @brief The position where the next construct will begin: the next token's start, or where input ended.
+     * @brief Where the next construct begins: the next token's start, or, when no token remains, the end of the
+     *        last consumed token.
      *
      * Capture this before parsing a construct and close the span with span_from() after it.
+     * @return The position.
      */
     [[nodiscard]] Source_position mark()
     {
@@ -161,7 +172,9 @@ protected:
     }
 
     /**
-     * @brief The span from a captured mark to the end of the most recently consumed token.
+     * @brief The span from a mark to the end of the most recently consumed token.
+     * @param begin The mark the construct began at.
+     * @return The span.
      */
     [[nodiscard]] Source_span span_from(const Source_position& begin) const noexcept
     {
@@ -169,10 +182,9 @@ protected:
     }
 
     /**
-     * @brief Throw a syntax error naming and pointing at the offending token.
-     *
-     * The reader's current span covers the offending token whether it was just consumed or is still buffered, so
-     * the error points at the right source range either way.
+     * @brief Raises the error for a token out of place, pointing at it.
+     * @param message What the grammar expected.
+     * @param where The token found instead, quoted in the message.
      */
     [[noreturn]] void syntax_error(const std::string_view message, const Token_t& where)
     {
@@ -182,7 +194,8 @@ protected:
     }
 
     /**
-     * @brief Throw a syntax error for input that ended too early, pointing one past the last consumed token.
+     * @brief Raises the error for input that ended too early, pointing one past the last consumed token.
+     * @param message What the grammar expected.
      */
     [[noreturn]] void eof_error(const std::string_view message)
     {
@@ -192,7 +205,8 @@ protected:
     }
 
     /**
-     * @brief Throw for input the lexer rejected, pointing at where tokenization stopped.
+     * @brief Raises the error for input the lexer rejected, pointing at where tokenization stopped.
+     * @param message The lexer's message.
      */
     [[noreturn]] void lexical_error(const std::string& message)
     {

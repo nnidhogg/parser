@@ -9,59 +9,60 @@
 namespace hopper::parse
 {
 /**
- * @brief Tracks the current position within the input source.
+ * @brief A position in the input, kept as a line, a column and a byte offset, advanced over consumed text.
  *
- * Maintains line, column, and byte offset counters that are advanced as tokens are consumed.
- * Used to provide accurate diagnostic information and source mapping during parsing.
+ * The offset counts every byte of the input as given, so it indexes the original text on any platform's line
+ * endings; the line and column are what a diagnostic prints.
  */
 class Token_location
 {
 public:
     /**
-     * @brief Construct a new location initialized to the start of the file (line 1, column 1).
+     * @brief Constructs the position of the input's first byte: line one, column one, offset zero.
      */
     Token_location();
 
     /**
-     * @brief Current line number (1-based).
+     * @brief The line, counted from one.
+     * @return The line number.
      */
     [[nodiscard]] std::size_t line() const noexcept;
 
     /**
-     * @brief Current column number (1-based).
+     * @brief The column within the line, counted from one in bytes.
+     * @return The column number.
      */
     [[nodiscard]] std::size_t column() const noexcept;
 
     /**
-     * @brief Current byte offset (0-based from the start of input).
+     * @brief The byte offset from the start of the input, counted from zero.
+     * @return The offset.
      */
     [[nodiscard]] std::size_t offset() const noexcept;
 
     /**
-     * @brief The current position as a value, for storing in spans.
+     * @brief The position as a value, for a span to hold.
+     * @return The position.
      */
     [[nodiscard]] Source_position position() const noexcept;
 
     /**
-     * @brief Reset the reading position to the beginning of the current input.
+     * @brief Returns to the input's first byte.
      */
     void reset() noexcept;
 
     /**
-     * @brief Advance the position over a consumed lexeme.
+     * @brief Advances over consumed text.
      *
-     * Newlines in the lexeme reset the column counter and increment the line number, so multi-line tokens
-     * advance the location correctly regardless of their kind.
-     *
-     * @param lexeme The text of the consumed token.
+     * A "\n", a "\r\n" pair and a lone '\r' each end a line: the line count rises by one and the column restarts at
+     * one after it, while the offset counts every byte, so a token spanning lines advances the position exactly.
+     * @param lexeme The text consumed.
      */
     void advance(std::string_view lexeme) noexcept;
 
 private:
     std::size_t line_;
-
     std::size_t column_;
-
     std::size_t offset_;
 };
 

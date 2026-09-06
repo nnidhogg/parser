@@ -18,9 +18,9 @@ language, no generated code and no runtime table.
 
 Two grammars ship on the kit. **JSON**, complete to RFC 8259 and held to every accepted and rejected case of the
 JSONTestSuite, parsed with an explicit stack so nesting depth is bounded by memory and not by the call stack. And the
-**C-like study grammar**, the token set the certified-recovery campaign is measured over, with a parser that reads
-keywords and multi-byte operators out of the campaign's coarse tokens the way a C lexer would have, so a parser over
-the measured grammar exists beside the measurements.
+**C-like study grammar**, the token set of one row of munch's recovery-quality campaign, with a parser that reads
+keywords and multi-byte operators out of the campaign's coarse tokens the way a C lexer would have, so a parser over the
+measured grammar exists beside the measurements.
 
 ## **Status: pre-1.0**
 
@@ -32,27 +32,24 @@ a parser may assume about its own state at that point is the open question the J
 
 ## **Features**
 
-- **A token reader over any munch lexer.** `parse::Token_reader<Kind>` wraps a `munch::core::Lexer` with one token
-  of lookahead, a skip predicate for trivia, and locations that count `"\r\n"` and a lone `'\r'` as one newline each
-  while offsets index the original bytes.
-- **A parser base with the operations a recursive-descent parser repeats.** `parse::Parser_base<Kind>` gives peek,
-  check, accept and expect over token kinds, `mark()` and `span_from()` to close a node's span, and three error
-  raisers whose messages name what was expected.
-- **Structured errors.** `parse::Parse_error` carries a kind, lexical, an unexpected token, an unexpected end, or an
-  invalid literal, and the source span it points at, with line, column and byte offset.
-- **Certified recovery.** `Parser_base::recover()` moves the stream past a lexical error to the next token start
-  munch certifies, under complete-repair invariance: in every completely tokenizable repair of the text before the
-  returned evidence, the answer begins a token. No repair is promised to exist, the next read may error again, and a
-  call with a token buffered throws rather than drop it.
-- **JSON.** `json::Parser` parses one RFC 8259 text into a `json::Value` tree: null, booleans, numbers kept as
-  spelled with a conversion to double on request, strings unescaped to UTF-8 with surrogate pairs combined, arrays,
-  and objects that keep members in document order with duplicates and answer a lookup with the last member of a
-  name. The lexer's string interior is built from munch's UTF-8 code point ranges, so a string that is not
-  well-formed UTF-8 never tokenizes.
-- **The C-like study grammar.** `clike::Parser` parses expressions, statements and translation units over the
-  campaign's seven token kinds: decimal integers, strings without escapes, booleans, the C operator ladder with
-  assignment and the ternary, calls, subscripts, member access, the four named casts, the fundamental types with
-  `const`, pointers and references, and `if`, `while`, `for`, `do`, `return`, blocks and declarations.
+- **A token reader over any munch lexer.** `parse::Token_reader<Kind>` wraps a `munch::core::Lexer` with one token of
+  lookahead, a skip predicate for trivia, and locations that count `"\r\n"` and a lone `'\r'` as one newline each while
+  offsets index the original bytes. - **A parser base with the operations a recursive-descent parser repeats.**
+  `parse::Parser_base<Kind>` gives peek, check, accept and expect over token kinds, `mark()` and `span_from()` to close
+  a node's span, and three error raisers whose messages name what was expected. - **Structured errors.**
+  `parse::Parse_error` carries a kind, lexical, an unexpected token, an unexpected end, or an invalid literal, and the
+  source span it points at, with line, column and byte offset. - **Certified recovery.** `Parser_base::recover()` moves
+  the stream past a lexical error to the next token start munch certifies, under complete-repair invariance: in every
+  completely tokenizable repair of the text before the returned evidence, the answer begins a token. No repair is
+  promised to exist, the next read may error again, and a call with a token buffered throws rather than drop it. -
+  **JSON.** `json::Parser` parses one RFC 8259 text into a `json::Value` tree: null, booleans, numbers kept as spelled
+  with a conversion to double on request, strings unescaped to UTF-8 with surrogate pairs combined, arrays, and objects
+  that keep members in document order with duplicates and answer a lookup with the last member of a name. The lexer's
+  string interior is built from munch's UTF-8 code point ranges, so a string that is not well-formed UTF-8 never
+  tokenizes. - **The C-like study grammar.** `clike::Parser` parses expressions, statements and translation units over
+  the campaign's seven token kinds; its language is decimal integers, strings without escapes, booleans, the C operator
+  ladder with assignment and the ternary, calls, subscripts, member access, the four named casts, the fundamental types
+  with `const`, pointers and references, and `if`, `while`, `for`, `do`, `return`, blocks and declarations.
 
 ## **Architecture Overview**
 
@@ -245,7 +242,19 @@ target_link_libraries(your_target PRIVATE hopper::json)   # or hopper::clike, or
 libraries, headers and a package config then install under the usual prefix, and a consumer writes
 `find_package(hopper)` and links the same `hopper::` names.
 
+## **Versioning and Stability**
+
+hopper is pre-1.0: the kit's public names, `parse::Token_reader`, `parse::Parser_base`, `parse::Parse_error`,
+`parse::Source_span` and their members, and the two grammars' `Parser` and tree types may still change before 1.0.
+From 1.0 the rule is munch's: a minor release adds and never removes or renames on the stable surface named here,
+and a major release is the only place a name disappears. The munch submodule is pinned to a release, and a hopper
+release names the munch release it was built and tested against.
+
 ## **License**
 
 MIT, see [LICENSE](LICENSE). The vendored JSONTestSuite cases are MIT as well; their notice is in
 [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## **Author**
+
+Developed and maintained by **Nicklas Nidhögg** GitHub: [nnidhogg](https://github.com/nnidhogg)

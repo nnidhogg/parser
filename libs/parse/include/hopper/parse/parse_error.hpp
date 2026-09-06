@@ -23,9 +23,9 @@ enum class Parse_error_kind
 /**
  * @brief A parse failure with its kind and the source range it points at.
  *
- * Derives from std::runtime_error, so existing catch sites keep working; what() carries the message prefixed with
- * the 1-based "line:column:" of the span's begin. The span covers the offending token, or is empty at the end of
- * input for errors with nothing left to point at.
+ * A std::runtime_error whose what() carries the message prefixed with the 1-based "line:column:" of the span's
+ * begin. The span covers the offending token, or is empty at the end of input for errors with nothing left to point
+ * at.
  */
 class Parse_error : public std::runtime_error
 {

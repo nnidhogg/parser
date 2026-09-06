@@ -198,7 +198,7 @@ public:
     /**
      * @brief The end position of the most recently consumed token, where a finished construct actually stops.
      */
-    [[nodiscard]] const Source_position& previous_end() const noexcept { return lookahead_.last_end(); }
+    [[nodiscard]] const Source_position& previous_end() const noexcept { return lookahead_.previous_end(); }
 
 private:
     /**

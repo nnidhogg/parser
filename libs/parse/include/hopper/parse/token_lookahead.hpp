@@ -11,10 +11,10 @@
 namespace hopper::parse
 {
 /**
- * @brief Holds the currently buffered (lookahead) token and its source location.
+ * @brief The one token a Token_reader holds ahead of the parser, with the positions around it.
  *
- * Used by a parser to support one-token lookahead behavior. Stores both the token returned from the lexer and its
- * associated location in the input.
+ * Three positions travel with the token: where it begins, where the cursor stands after it, and where the last
+ * consumed token ended, which is where a construct that has just finished stops whatever is buffered ahead of it.
  * @tparam Kind The token kind type (enum or integral) produced by the lexer.
  */
 template <typename Kind>
@@ -22,55 +22,55 @@ class Token_lookahead
 {
 public:
     /**
-     * @brief Alias for the token type produced by the underlying lexer.
+     * @brief The token type the lexer produces.
      */
     using Token_t = munch::tools::tokenizer::Token<Kind>;
 
     /**
-     * @brief Constructs an empty lookahead state.
+     * @brief Constructs an empty lookahead at the input's first byte.
      */
     Token_lookahead() = default;
 
     /**
-     * @brief Access the current lookahead token, if any.
+     * @brief The buffered token.
+     * @return The token, or std::nullopt when nothing is buffered.
      */
     [[nodiscard]] const std::optional<Token_t>& token() const noexcept { return token_; }
 
     /**
-     * @brief Access the location of the current token's first character.
+     * @brief Where the buffered token begins.
+     * @return The location of its first byte.
      */
     [[nodiscard]] const Token_location& location() const noexcept { return begin_; }
 
     /**
-     * @brief The span of the current token: its first byte to one past its last.
+     * @brief The buffered token's span, from its first byte to one past its last.
+     * @return The span.
      */
     [[nodiscard]] Source_span span() const noexcept { return {.begin = begin_.position(), .end = cursor_.position()}; }
 
     /**
-     * @brief The end position of the most recently consumed token.
-     *
-     * This is where a grammar construct that just finished actually stops, unaffected by any token already
-     * buffered ahead of it.
+     * @brief Where the most recently consumed token ended, whatever is buffered ahead of it.
+     * @return The position one past that token's last byte.
      */
-    [[nodiscard]] const Source_position& last_end() const noexcept { return last_end_; }
+    [[nodiscard]] const Source_position& previous_end() const noexcept { return previous_end_; }
 
     /**
-     * @brief Consume and clear the buffered token.
-     *
-     * Returns the currently stored token (if any) and resets the internal optional to an empty state.
+     * @brief Hands the buffered token over and clears the buffer, recording where the token ended.
+     * @return The token, or std::nullopt when nothing was buffered.
      */
     std::optional<Token_t> consume() noexcept
     {
         if (token_)
         {
-            last_end_ = cursor_.position();
+            previous_end_ = cursor_.position();
         }
 
         return std::exchange(token_, std::nullopt);
     }
 
     /**
-     * @brief Reset the reading position to the beginning of the current input and clear the token.
+     * @brief Returns to the input's first byte and clears the buffer.
      */
     void reset() noexcept
     {
@@ -80,14 +80,16 @@ public:
 
         cursor_.reset();
 
-        last_end_ = {};
+        previous_end_ = {};
     }
 
     /**
-     * @brief Update the lookahead token and advance the source location.
+     * @brief Buffers a token just read and moves the cursor past it.
      *
-     * Called when a new token is read from the lexer. It updates both the stored token and the internal source
-     * position tracker.
+     * The token begins where the cursor stood; the cursor runs ahead over the lexeme so the next token's beginning is
+     * already known.
+     * @param kind The token's kind.
+     * @param lexeme The token's text.
      */
     void advance(const Kind kind, const std::string_view lexeme) noexcept
     {
@@ -101,7 +103,8 @@ public:
     }
 
     /**
-     * @brief Advance the source location over bytes skipped without a token; the span then stands empty there.
+     * @brief Moves the cursor over bytes skipped without a token, leaving the buffer empty and the span empty there.
+     * @param bytes The bytes skipped.
      */
     void skip(const std::string_view bytes) noexcept
     {
@@ -119,7 +122,7 @@ private:
 
     Token_location cursor_;
 
-    Source_position last_end_{};
+    Source_position previous_end_{};
 };
 
 } // namespace hopper::parse

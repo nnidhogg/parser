@@ -1,11 +1,11 @@
-# Design
+# **Design**
 
 The decisions behind hopper, in the order a reader meets them: the kit every parser is built on, the two grammars
 that ship on it, and the resumption question the JSON grammar was chosen to ask.
 
-## The kit is a token stream, not a parser generator
+## **The kit is a token stream, not a parser generator**
 
-`hopper::parse` is four things and no framework: a `Token_reader` that turns a `munch::core::Lexer` into a stream
+`hopper::parse` is a handful of headers and no framework: a `Token_reader` that turns a `munch::core::Lexer` into a stream
 with one token of lookahead and discards the kinds a predicate names as trivia; a `Token_location` that counts lines
 and columns over the original bytes, so every span indexes the input as given whatever its line endings; a
 `Parse_error` that carries a kind and the span it points at; and a `Parser_base` with the handful of operations a
@@ -13,11 +13,13 @@ hand-written recursive-descent parser repeats, peek, accept, expect, mark a posi
 grammar is a class deriving from `Parser_base` and writing its productions as methods. There is no grammar
 description language, no generated code and no runtime table; the productions are the documentation.
 
-The lexer is munch's, always. hopper never scans bytes itself, so everything munch proves about its lexers, the
+The lexer is munch's, always. hopper never tokenizes bytes itself; the two places it looks inside a token, the C-like
+parser fusing adjacent operator bytes and the JSON parser resolving a string's escapes, act on tokens munch has
+already cut, so everything munch proves about its lexers, the
 maximal-munch segmentation, the certified split points and the certified recovery, holds unchanged under a hopper
 parser, and a parser inherits munch's contracts rather than restating them.
 
-## Recovery is inherited, not invented
+## **Recovery is inherited, not invented**
 
 After a lexical error `Parser_base::recover()` asks the reader, and the reader asks munch's `recover_from_failure()`:
 the stream moves to the next position the lexer certifies as a token start, under munch's complete-repair invariance,
@@ -25,7 +27,7 @@ or does not move at all. The parser learns where the token stream resumes and no
 resumed stream is its own policy, and the kit refuses to guess one. A call with a token buffered is a logic error and
 throws, because it means the caller is not standing at a lexical error.
 
-## Two grammars, chosen for what they let the kit ask
+## **Two grammars, chosen for what they let the kit ask**
 
 **JSON** is the first grammar because it sits where the next question is decidable. JSON is a visibly pushdown
 language: brackets and braces determine the stack, so the parser's state after any prefix is the list of open
@@ -52,7 +54,7 @@ with `const`, pointers and references, and the statements a C body is made of. T
 the measured token set is available when the resumption question moves past the visibly pushdown class, to a
 grammar whose brackets determine most of the stack and not all of it.
 
-## What the JSON grammar is for next
+## **What the JSON grammar is for next**
 
 The lexical papers answer where a scanner may start. A parser's question is what configuration it may assume when
 it restarts at such a position. For JSON the configuration is the open-container stack plus, inside an object, the
