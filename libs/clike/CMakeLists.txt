@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 cmake_policy(SET CMP0097 NEW)
-project(hopper_cpp)
+project(hopper_clike)
 
 add_library(${PROJECT_NAME}
         src/lexer.cpp

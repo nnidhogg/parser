@@ -1,5 +1,5 @@
-#ifndef HOPPER_LIBS_CPP_INCLUDE_HOPPER_CPP_AST_UNIT_HPP
-#define HOPPER_LIBS_CPP_INCLUDE_HOPPER_CPP_AST_UNIT_HPP
+#ifndef HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_UNIT_HPP
+#define HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_UNIT_HPP
 
 #include <cstddef>
 #include <memory>
@@ -8,11 +8,11 @@
 #include <variant>
 #include <vector>
 
-#include "hopper/cpp/ast/decl.hpp"
-#include "hopper/cpp/ast/stmt.hpp"
+#include "hopper/clike/ast/decl.hpp"
+#include "hopper/clike/ast/stmt.hpp"
 #include "hopper/parse/source_span.hpp"
 
-namespace hopper::cpp::ast
+namespace hopper::clike::ast
 {
 /**
  * @brief One function parameter, e.g. `const char* name` in a parameter list.
@@ -22,10 +22,29 @@ namespace hopper::cpp::ast
  */
 struct Parameter
 {
+    /**
+     * @brief The parameter's qualified type.
+     */
     Type type;
+
+    /**
+     * @brief The pointer depth: one star per level.
+     */
     std::size_t pointers;
+
+    /**
+     * @brief Whether the parameter is a reference.
+     */
     bool reference;
+
+    /**
+     * @brief The parameter's name, empty when unnamed.
+     */
     std::string name;
+
+    /**
+     * @brief The default argument, when there is one.
+     */
     std::optional<Expr> default_value;
 };
 
@@ -37,11 +56,34 @@ struct Parameter
  */
 struct Function
 {
+    /**
+     * @brief The qualified return type.
+     */
     Type return_type;
+
+    /**
+     * @brief The return type's pointer depth.
+     */
     std::size_t pointers;
+
+    /**
+     * @brief Whether the return type is a reference.
+     */
     bool reference;
+
+    /**
+     * @brief The function's name.
+     */
     std::string name;
+
+    /**
+     * @brief The parameters, in source order.
+     */
     std::vector<Parameter> parameters;
+
+    /**
+     * @brief The body, or null for a prototype.
+     */
     std::unique_ptr<Stmt> body;
 };
 
@@ -63,10 +105,16 @@ struct Translation_unit
         /**
          * @brief The node this item holds.
          */
+        /**
+         * @brief The item itself.
+         */
         Node_t node;
 
         /**
          * @brief The source range this item was parsed from.
+         */
+        /**
+         * @brief The source range the item was parsed from.
          */
         parse::Source_span span{};
     };
@@ -74,9 +122,11 @@ struct Translation_unit
     /**
      * @brief The items in source order.
      */
+    /**
+     * @brief The items, in source order.
+     */
     std::vector<Item> items;
 };
+} // namespace hopper::clike::ast
 
-} // namespace hopper::cpp::ast
-
-#endif // HOPPER_LIBS_CPP_INCLUDE_HOPPER_CPP_AST_UNIT_HPP
+#endif // HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_UNIT_HPP

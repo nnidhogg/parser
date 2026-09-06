@@ -1,15 +1,15 @@
-#ifndef HOPPER_LIBS_CPP_INCLUDE_HOPPER_CPP_AST_STMT_HPP
-#define HOPPER_LIBS_CPP_INCLUDE_HOPPER_CPP_AST_STMT_HPP
+#ifndef HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_STMT_HPP
+#define HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_STMT_HPP
 
 #include <memory>
 #include <optional>
 #include <variant>
 #include <vector>
 
-#include "hopper/cpp/ast/decl.hpp"
-#include "hopper/cpp/ast/expr.hpp"
+#include "hopper/clike/ast/decl.hpp"
+#include "hopper/clike/ast/expr.hpp"
 
-namespace hopper::cpp::ast
+namespace hopper::clike::ast
 {
 struct Stmt;
 
@@ -18,6 +18,9 @@ struct Stmt;
  */
 struct Expr_stmt
 {
+    /**
+     * @brief The expression evaluated for its effect.
+     */
     Expr expr;
 };
 
@@ -33,6 +36,9 @@ struct Empty
  */
 struct Compound
 {
+    /**
+     * @brief The statements, in source order.
+     */
     std::vector<Stmt> statements;
 };
 
@@ -44,8 +50,19 @@ struct Compound
  */
 struct If
 {
+    /**
+     * @brief The condition.
+     */
     Expr condition;
+
+    /**
+     * @brief The statement run when the condition holds.
+     */
     std::unique_ptr<Stmt> then_branch;
+
+    /**
+     * @brief The statement run when it does not, or null when there is no else.
+     */
     std::unique_ptr<Stmt> else_branch;
 };
 
@@ -54,7 +71,14 @@ struct If
  */
 struct While
 {
+    /**
+     * @brief The condition tested before each iteration.
+     */
     Expr condition;
+
+    /**
+     * @brief The loop body.
+     */
     std::unique_ptr<Stmt> body;
 };
 
@@ -67,9 +91,24 @@ struct While
  */
 struct For
 {
+    /**
+     * @brief The initializer: a declaration, an expression statement or the empty statement.
+     */
     std::unique_ptr<Stmt> init;
+
+    /**
+     * @brief The condition, when there is one.
+     */
     std::optional<Expr> condition;
+
+    /**
+     * @brief The step expression, when there is one.
+     */
     std::optional<Expr> step;
+
+    /**
+     * @brief The loop body.
+     */
     std::unique_ptr<Stmt> body;
 };
 
@@ -78,7 +117,14 @@ struct For
  */
 struct Do_while
 {
+    /**
+     * @brief The loop body.
+     */
     std::unique_ptr<Stmt> body;
+
+    /**
+     * @brief The condition tested after each iteration.
+     */
     Expr condition;
 };
 
@@ -87,6 +133,9 @@ struct Do_while
  */
 struct Return
 {
+    /**
+     * @brief The returned value, when there is one.
+     */
     std::optional<Expr> value;
 };
 
@@ -103,14 +152,19 @@ struct Stmt
     /**
      * @brief The node this statement holds.
      */
+    /**
+     * @brief The statement itself.
+     */
     Node_t node;
 
     /**
      * @brief The source range this statement was parsed from.
      */
+    /**
+     * @brief The source range the statement was parsed from.
+     */
     parse::Source_span span{};
 };
+} // namespace hopper::clike::ast
 
-} // namespace hopper::cpp::ast
-
-#endif // HOPPER_LIBS_CPP_INCLUDE_HOPPER_CPP_AST_STMT_HPP
+#endif // HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_STMT_HPP

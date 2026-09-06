@@ -1,15 +1,15 @@
-#ifndef HOPPER_LIBS_CPP_INCLUDE_HOPPER_CPP_AST_DECL_HPP
-#define HOPPER_LIBS_CPP_INCLUDE_HOPPER_CPP_AST_DECL_HPP
+#ifndef HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_DECL_HPP
+#define HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_DECL_HPP
 
 #include <cstddef>
 #include <optional>
 #include <string>
 #include <vector>
 
-#include "hopper/cpp/ast/expr.hpp"
-#include "hopper/cpp/ast/type.hpp"
+#include "hopper/clike/ast/expr.hpp"
+#include "hopper/clike/ast/type.hpp"
 
-namespace hopper::cpp::ast
+namespace hopper::clike::ast
 {
 /**
  * @brief One declared entity, e.g. `**&name = value` within a declaration.
@@ -20,9 +20,24 @@ namespace hopper::cpp::ast
  */
 struct Declarator
 {
+    /**
+     * @brief The pointer depth: one star per level.
+     */
     std::size_t pointers;
+
+    /**
+     * @brief Whether the declared name is a reference.
+     */
     bool reference;
+
+    /**
+     * @brief The declared name.
+     */
     std::string name;
+
+    /**
+     * @brief The initializer after `=`, when there is one.
+     */
     std::optional<Expr> initializer;
 };
 
@@ -34,10 +49,16 @@ struct Declarator
  */
 struct Declaration
 {
+    /**
+     * @brief The type every declarator shares.
+     */
     Type type;
+
+    /**
+     * @brief The declarators, in source order.
+     */
     std::vector<Declarator> declarators;
 };
+} // namespace hopper::clike::ast
 
-} // namespace hopper::cpp::ast
-
-#endif // HOPPER_LIBS_CPP_INCLUDE_HOPPER_CPP_AST_DECL_HPP
+#endif // HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_DECL_HPP

@@ -1,50 +1,72 @@
 #include <optional>
 #include <string>
+#include <string_view>
 #include <utility>
 #include <vector>
 
-#include "hopper/cpp/parser.hpp"
+#include "hopper/clike/parser.hpp"
 
-namespace hopper::cpp
+namespace hopper::clike
 {
 namespace
 {
 /**
- * @brief Maps a type keyword to its type kind, or nullopt for tokens that name no fundamental type.
+ * @brief The fundamental type a keyword names.
+ * @param word The identifier's spelling.
+ * @return The type kind, or std::nullopt when the word names no type.
  */
-std::optional<ast::Type_kind> type_kind_for(const Token_kind kind)
+std::optional<ast::Type_kind> type_kind_for(const std::string_view word)
 {
-    switch (kind)
+    if (word == "bool")
     {
-    case Token_kind::Keyword_bool:
         return ast::Type_kind::Bool;
-    case Token_kind::Keyword_char:
-        return ast::Type_kind::Char;
-    case Token_kind::Keyword_int:
-        return ast::Type_kind::Int;
-    case Token_kind::Keyword_float:
-        return ast::Type_kind::Float;
-    case Token_kind::Keyword_double:
-        return ast::Type_kind::Double;
-    case Token_kind::Keyword_void:
-        return ast::Type_kind::Void;
-    default:
-        return std::nullopt;
     }
-}
 
+    if (word == "char")
+    {
+        return ast::Type_kind::Char;
+    }
+
+    if (word == "int")
+    {
+        return ast::Type_kind::Int;
+    }
+
+    if (word == "float")
+    {
+        return ast::Type_kind::Float;
+    }
+
+    if (word == "double")
+    {
+        return ast::Type_kind::Double;
+    }
+
+    if (word == "void")
+    {
+        return ast::Type_kind::Void;
+    }
+
+    return std::nullopt;
+}
 } // namespace
 
 bool Parser::is_declaration_start()
 {
+    if (pending_)
+    {
+        return false;
+    }
+
     const auto token{peek_token()};
 
-    return token && (token->kind() == Token_kind::Keyword_const || type_kind_for(token->kind()).has_value());
+    return token && token->kind() == Token_kind::Identifier &&
+           (token->lexeme() == "const" || type_kind_for(token->lexeme()).has_value());
 }
 
 ast::Stmt Parser::parse_declaration_statement()
 {
-    const auto begin{mark()};
+    const auto begin{here()};
 
     auto type{parse_type_specifier()};
 
@@ -52,19 +74,24 @@ ast::Stmt Parser::parse_declaration_statement()
 
     declarators.push_back(parse_declarator());
 
-    while (accept(Token_kind::Comma))
+    while (accept_punctuation(','))
     {
         declarators.push_back(parse_declarator());
     }
 
-    expect(Token_kind::Semicolon, "';' after the declaration");
+    expect_punctuation(';', "';' after the declaration");
 
-    return {.node = ast::Declaration{.type = type, .declarators = std::move(declarators)}, .span = span_from(begin)};
+    return {.node = ast::Declaration{.type = type, .declarators = std::move(declarators)}, .span = close(begin)};
 }
 
 ast::Type Parser::parse_type_specifier()
 {
-    auto is_const{accept(Token_kind::Keyword_const).has_value()};
+    auto is_const{accept_keyword("const")};
+
+    if (pending_)
+    {
+        unexpected("a type name");
+    }
 
     const auto token{next_token()};
 
@@ -73,20 +100,21 @@ ast::Type Parser::parse_type_specifier()
         eof_error("Expected a type name before end of input");
     }
 
-    const auto kind{type_kind_for(token->kind())};
+    const auto kind{token->kind() == Token_kind::Identifier ? type_kind_for(token->lexeme()) : std::nullopt};
 
     if (!kind)
     {
         syntax_error("Expected a type name", *token);
     }
 
-    // The qualifier may also follow the type name (`int const`), but only one placement may be used.
-    if (const auto duplicate{accept(Token_kind::Keyword_const)}; duplicate)
+    if (check_keyword("const"))
     {
         if (is_const)
         {
-            syntax_error("Duplicate 'const' qualifier", *duplicate);
+            unexpected("a declarator, not a second 'const'");
         }
+
+        (void)accept_keyword("const");
 
         is_const = true;
     }
@@ -100,12 +128,12 @@ ast::Type_id Parser::parse_type_id()
 
     std::size_t pointers{0};
 
-    while (accept(Token_kind::Star))
+    while (accept_operator("*"))
     {
         ++pointers;
     }
 
-    const bool reference{accept(Token_kind::Amp).has_value()};
+    const bool reference{accept_operator("&")};
 
     return {.type = type, .pointers = pointers, .reference = reference};
 }
@@ -114,18 +142,18 @@ ast::Declarator Parser::parse_declarator()
 {
     std::size_t pointers{0};
 
-    while (accept(Token_kind::Star))
+    while (accept_operator("*"))
     {
         ++pointers;
     }
 
-    const auto reference{accept(Token_kind::Amp).has_value()};
+    const auto reference{accept_operator("&")};
 
-    const auto name{expect(Token_kind::Identifier, "a declarator name")};
+    const auto name{expect_identifier("a declarator name")};
 
     std::optional<ast::Expr> initializer;
 
-    if (accept(Token_kind::Equal))
+    if (accept_operator("="))
     {
         initializer = parse_assignment();
     }
@@ -135,5 +163,4 @@ ast::Declarator Parser::parse_declarator()
             .name = std::string{name.lexeme()},
             .initializer = std::move(initializer)};
 }
-
-} // namespace hopper::cpp
+} // namespace hopper::clike

@@ -1,4 +1,4 @@
-#include "hopper/cpp/parser.hpp"
+#include "hopper/clike/parser.hpp"
 
 #include <gtest/gtest.h>
 
@@ -6,12 +6,13 @@
 #include <string>
 #include <type_traits>
 
-#include "hopper/cpp/lexer.hpp"
-
-using namespace hopper::cpp;
+using namespace hopper::clike;
 
 namespace
 {
+/**
+ * @brief The spelling of a binary operator.
+ */
 std::string operator_symbol(const ast::Binary_op op)
 {
     switch (op)
@@ -57,6 +58,9 @@ std::string operator_symbol(const ast::Binary_op op)
     return "?";
 }
 
+/**
+ * @brief The spelling of a unary operator.
+ */
 std::string operator_symbol(const ast::Unary_op op)
 {
     switch (op)
@@ -82,6 +86,9 @@ std::string operator_symbol(const ast::Unary_op op)
     return "?";
 }
 
+/**
+ * @brief The spelling of a postfix operator.
+ */
 std::string operator_symbol(const ast::Postfix_op op)
 {
     switch (op)
@@ -95,6 +102,9 @@ std::string operator_symbol(const ast::Postfix_op op)
     return "?";
 }
 
+/**
+ * @brief The spelling of a member access.
+ */
 std::string operator_symbol(const ast::Member_op op)
 {
     switch (op)
@@ -108,6 +118,9 @@ std::string operator_symbol(const ast::Member_op op)
     return "?";
 }
 
+/**
+ * @brief The spelling of an assignment operator.
+ */
 std::string operator_symbol(const ast::Assign_op op)
 {
     switch (op)
@@ -139,6 +152,9 @@ std::string operator_symbol(const ast::Assign_op op)
     return "?";
 }
 
+/**
+ * @brief The keyword of a named cast.
+ */
 std::string cast_keyword(const ast::Cast_kind kind)
 {
     switch (kind)
@@ -154,6 +170,9 @@ std::string cast_keyword(const ast::Cast_kind kind)
     }
 }
 
+/**
+ * @brief The keyword of a fundamental type.
+ */
 std::string type_name(const ast::Type_kind kind)
 {
     switch (kind)
@@ -173,6 +192,9 @@ std::string type_name(const ast::Type_kind kind)
     }
 }
 
+/**
+ * @brief A type id printed as declared.
+ */
 std::string to_string(const ast::Type_id& type)
 {
     std::string result{type.type.is_const ? "const " : ""};
@@ -191,6 +213,9 @@ std::string to_string(const ast::Type_id& type)
 
 // Renders the AST back as a fully-parenthesized expression, so precedence and associativity are visible directly
 // in the expected string rather than in a deeply nested chain of std::get<> assertions.
+/**
+ * @brief An expression printed with every operation parenthesized, so the tree's shape is visible.
+ */
 std::string to_string(const ast::Expr& expr)
 {
     return std::visit(
@@ -201,10 +226,6 @@ std::string to_string(const ast::Expr& expr)
                 {
                     return std::to_string(node.value);
                 }
-                else if constexpr (std::is_same_v<Node_t, ast::Float_literal>)
-                {
-                    return std::to_string(node.value);
-                }
                 else if constexpr (std::is_same_v<Node_t, ast::Bool_literal>)
                 {
                     return node.value ? "true" : "false";
@@ -212,10 +233,6 @@ std::string to_string(const ast::Expr& expr)
                 else if constexpr (std::is_same_v<Node_t, ast::String_literal>)
                 {
                     return "\"" + node.value + "\"";
-                }
-                else if constexpr (std::is_same_v<Node_t, ast::Char_literal>)
-                {
-                    return "'" + node.value + "'";
                 }
                 else if constexpr (std::is_same_v<Node_t, ast::Name>)
                 {
@@ -271,6 +288,9 @@ std::string to_string(const ast::Expr& expr)
             expr.node);
 }
 
+/**
+ * @brief A qualified type printed as declared.
+ */
 std::string type_name(const ast::Type& type)
 {
     const auto name{[&type]() -> std::string {
@@ -296,6 +316,9 @@ std::string type_name(const ast::Type& type)
     return (type.is_const ? "const " : "") + name;
 }
 
+/**
+ * @brief A declaration printed as declared.
+ */
 std::string to_string(const ast::Declaration& declaration)
 {
     std::string declarators;
@@ -312,6 +335,9 @@ std::string to_string(const ast::Declaration& declaration)
 
 // Renders the AST back as compact source, bracing the branches of if and while so the two possible bindings of a
 // dangling else render differently.
+/**
+ * @brief A statement printed in a fixed compact form.
+ */
 std::string to_string(const ast::Stmt& stmt)
 {
     return std::visit(
@@ -370,6 +396,9 @@ std::string to_string(const ast::Stmt& stmt)
             stmt.node);
 }
 
+/**
+ * @brief A parameter printed as declared.
+ */
 std::string to_string(const ast::Parameter& parameter)
 {
     const auto declarator{
@@ -379,6 +408,9 @@ std::string to_string(const ast::Parameter& parameter)
     return declarator.empty() ? type_name(parameter.type) : type_name(parameter.type) + " " + declarator;
 }
 
+/**
+ * @brief A function printed as declared, its body included.
+ */
 std::string to_string(const ast::Function& function)
 {
     std::string parameters;
@@ -393,6 +425,9 @@ std::string to_string(const ast::Function& function)
            (function.body ? to_string(*function.body) : ";");
 }
 
+/**
+ * @brief A translation unit printed item by item.
+ */
 std::string to_string(const ast::Translation_unit& unit)
 {
     std::string items;
@@ -405,27 +440,149 @@ std::string to_string(const ast::Translation_unit& unit)
     return items;
 }
 
+/**
+ * @brief Parses a text as an expression with a fresh parser.
+ */
 ast::Expr parse(const std::string& input)
 {
-    Parser parser{build_lexer(), input};
+    Parser parser{input};
 
     return parser.parse_expression();
 }
 
+/**
+ * @brief Parses a text as a statement with a fresh parser.
+ */
 ast::Stmt parse_stmt(const std::string& input)
 {
-    Parser parser{build_lexer(), input};
+    Parser parser{input};
 
     return parser.parse_statement();
 }
 
+/**
+ * @brief Parses a text as a translation unit with a fresh parser.
+ */
 ast::Translation_unit parse_unit(const std::string& input)
 {
-    Parser parser{build_lexer(), input};
+    Parser parser{input};
 
     return parser.parse_translation_unit();
 }
 
+/**
+ * @brief Builds random expression ASTs from a fixed seed, for the print-and-reparse round trip.
+ *
+ * Every shape the renderer prints unambiguously is generated; spans are left empty, which the round trip ignores
+ * because it compares printed forms.
+ */
+class Expr_generator
+{
+public:
+    explicit Expr_generator(const unsigned seed) : seed_{seed} {}
+
+    ast::Expr expression(const int depth)
+    {
+        if (depth == 0 || next() % 4 == 0)
+        {
+            return leaf();
+        }
+
+        switch (next() % 8)
+        {
+        case 0:
+        {
+            constexpr ast::Binary_op ops[]{ast::Binary_op::Add,         ast::Binary_op::Subtract,
+                                           ast::Binary_op::Multiply,    ast::Binary_op::Less,
+                                           ast::Binary_op::Equal,       ast::Binary_op::Shift_left,
+                                           ast::Binary_op::Bitwise_and, ast::Binary_op::Logical_or};
+
+            return wrap(ast::Binary{
+                    .op = ops[next() % 8],
+                    .lhs = boxed(expression(depth - 1)),
+                    .rhs = boxed(expression(depth - 1))});
+        }
+        case 1:
+        {
+            constexpr ast::Unary_op ops[]{
+                    ast::Unary_op::Minus, ast::Unary_op::Not, ast::Unary_op::Bitwise_not, ast::Unary_op::Dereference,
+                    ast::Unary_op::Address_of};
+
+            return wrap(ast::Unary{.op = ops[next() % 5], .operand = boxed(expression(depth - 1))});
+        }
+        case 2:
+            return wrap(ast::Ternary{
+                    .condition = boxed(expression(depth - 1)),
+                    .then_branch = boxed(expression(depth - 1)),
+                    .else_branch = boxed(expression(depth - 1))});
+        case 3:
+        {
+            std::vector<ast::Expr> arguments;
+
+            for (auto count{next() % 3}; count > 0; --count)
+            {
+                arguments.push_back(expression(depth - 1));
+            }
+
+            return wrap(ast::Call{.callee = boxed(name()), .arguments = std::move(arguments)});
+        }
+        case 4:
+            return wrap(ast::Member{
+                    .op = next() % 2 == 0 ? ast::Member_op::Dot : ast::Member_op::Arrow,
+                    .object = boxed(expression(depth - 1)),
+                    .member = identifiers_[next() % 4]});
+        case 5:
+            return wrap(ast::Subscript{.object = boxed(expression(depth - 1)), .index = boxed(expression(depth - 1))});
+        case 6:
+        {
+            constexpr ast::Cast_kind kinds[]{
+                    ast::Cast_kind::Static, ast::Cast_kind::Dynamic, ast::Cast_kind::Const,
+                    ast::Cast_kind::Reinterpret};
+
+            constexpr ast::Type_kind types[]{ast::Type_kind::Char, ast::Type_kind::Int, ast::Type_kind::Double};
+
+            return wrap(ast::Cast{
+                    .kind = kinds[next() % 4],
+                    .type =
+                            {.type = {.is_const = next() % 2 == 0, .kind = types[next() % 3]},
+                             .pointers = next() % 3,
+                             .reference = next() % 2 == 0},
+                    .operand = boxed(expression(depth - 1))});
+        }
+        default:
+            return wrap(ast::Assign{
+                    .op = next() % 2 == 0 ? ast::Assign_op::Assign : ast::Assign_op::Add,
+                    .target = boxed(expression(depth - 1)),
+                    .value = boxed(expression(depth - 1))});
+        }
+    }
+
+private:
+    unsigned next() { return seed_ = seed_ * 1664525U + 1013904223U, seed_ >> 16U; }
+
+    static ast::Expr wrap(auto node) { return {.node = std::move(node)}; }
+
+    static std::unique_ptr<ast::Expr> boxed(ast::Expr expr) { return std::make_unique<ast::Expr>(std::move(expr)); }
+
+    ast::Expr name() { return wrap(ast::Name{.identifier = identifiers_[next() % 4]}); }
+
+    ast::Expr leaf()
+    {
+        switch (next() % 3)
+        {
+        case 0:
+            return wrap(ast::Int_literal{.value = static_cast<long long>(next() % 1000)});
+        case 1:
+            return wrap(ast::Bool_literal{.value = next() % 2 == 0});
+        default:
+            return name();
+        }
+    }
+
+    unsigned seed_;
+
+    const char* identifiers_[4]{"alpha", "beta", "gamma", "delta"};
+};
 } // namespace
 
 TEST(Parser_test, Integer_literal)
@@ -434,14 +591,6 @@ TEST(Parser_test, Integer_literal)
 
     ASSERT_TRUE(std::holds_alternative<ast::Int_literal>(expr.node));
     EXPECT_EQ(std::get<ast::Int_literal>(expr.node).value, 42);
-}
-
-TEST(Parser_test, Floating_point_literal)
-{
-    const auto expr{parse("3.5")};
-
-    ASSERT_TRUE(std::holds_alternative<ast::Float_literal>(expr.node));
-    EXPECT_DOUBLE_EQ(std::get<ast::Float_literal>(expr.node).value, 3.5);
 }
 
 TEST(Parser_test, Boolean_literals)
@@ -950,7 +1099,7 @@ TEST(Parser_test, Declaration_types)
     EXPECT_EQ(to_string(parse_stmt("bool flag = true;")), "bool flag=true;");
     EXPECT_EQ(to_string(parse_stmt("char letter;")), "char letter;");
     EXPECT_EQ(to_string(parse_stmt("float ratio;")), "float ratio;");
-    EXPECT_EQ(to_string(parse_stmt("double value = 3.5;")), "double value=3.500000;");
+    EXPECT_EQ(to_string(parse_stmt("double value = 35;")), "double value=35;");
     EXPECT_EQ(to_string(parse_stmt("void* opaque;")), "void *opaque;");
 }
 
@@ -1068,7 +1217,7 @@ TEST(Parser_test, Function_prototype_with_pointer_shapes)
 
 TEST(Parser_test, Function_parameters_may_be_unnamed_or_defaulted)
 {
-    EXPECT_EQ(to_string(parse_unit("void log(int, double level = 1.5);")), "void log(int,double level=1.500000);");
+    EXPECT_EQ(to_string(parse_unit("void log(int, double level = 15);")), "void log(int,double level=15);");
 }
 
 TEST(Parser_test, Function_returning_a_reference)
@@ -1148,63 +1297,37 @@ TEST(Parser_test, Dereference_in_statements_and_loops)
     EXPECT_EQ(to_string(parse_stmt("int* p = &x;")), "int *p=(&x);");
 }
 
-TEST(Parser_test, String_literals)
+TEST(Parser_test, String_literals_hold_their_bytes_as_written)
 {
     EXPECT_EQ(to_string(parse("\"hello\"")), "\"hello\"");
     EXPECT_EQ(to_string(parse("\"\"")), "\"\"");
-
-    // Escape sequences stay exactly as written; decoding them is a semantic concern.
-    EXPECT_EQ(to_string(parse("\"a\\\"b\\n\"")), "\"a\\\"b\\n\"");
-
+    EXPECT_EQ(to_string(parse("\"a\\b\"")), "\"a\\b\"");
     EXPECT_EQ(to_string(parse("f(\"x\", 1)")), "f(\"x\",1)");
-}
-
-TEST(Parser_test, Character_literals)
-{
-    EXPECT_EQ(to_string(parse("'x'")), "'x'");
-    EXPECT_EQ(to_string(parse("'\\n'")), "'\\n'");
-    EXPECT_EQ(to_string(parse("'\\''")), "'\\''");
-    EXPECT_EQ(to_string(parse("'a' + 'b'")), "('a'+'b')");
-}
-
-TEST(Parser_test, Hexadecimal_and_binary_integers)
-{
-    EXPECT_EQ(to_string(parse("0xFF")), "255");
-    EXPECT_EQ(to_string(parse("0x0")), "0");
-    EXPECT_EQ(to_string(parse("0b101")), "5");
-    EXPECT_EQ(to_string(parse("0xff + 0b1")), "(255+1)");
-}
-
-TEST(Parser_test, Comments_are_trivia)
-{
-    EXPECT_EQ(to_string(parse("1 // trailing comment")), "1");
-    EXPECT_EQ(to_string(parse("1 /* inline */ + /* another */ 2")), "(1+2)");
-    EXPECT_EQ(to_string(parse("/* leading\n   multiline */ 42")), "42");
-    EXPECT_EQ(to_string(parse("1 /* stars ** inside * */ + 2")), "(1+2)");
-    EXPECT_EQ(to_string(parse("/**/1")), "1");
-
-    // Division survives: a lone '/' is still an operator.
-    EXPECT_EQ(to_string(parse("a / b")), "(a/b)");
-}
-
-TEST(Parser_test, Literals_in_declarations)
-{
-    EXPECT_EQ(to_string(parse_stmt("const char* s = \"hi\";")), "const char *s=\"hi\";");
-    EXPECT_EQ(to_string(parse_stmt("char c = '\\t';")), "char c='\\t';");
-    EXPECT_EQ(to_string(parse_stmt("int mask = 0b11 & 0x0F;")), "int mask=(3&15);");
-}
-
-TEST(Parser_test, Throws_on_unterminated_literals_and_comments)
-{
     EXPECT_THROW(parse("\"abc"), std::runtime_error);
     EXPECT_THROW(parse("\"a\nb\""), std::runtime_error);
-    EXPECT_THROW(parse("'ab'"), std::runtime_error);
-    EXPECT_THROW(parse("/* never closed"), std::runtime_error);
+}
+
+TEST(Parser_test, Multi_byte_operators_are_fused_from_adjacent_operator_bytes_only)
+{
+    EXPECT_EQ(to_string(parse("a <<= 1")), "(a<<=1)");
+    EXPECT_EQ(to_string(parse("a+-b")), "(a+(-b))");
+    EXPECT_EQ(to_string(parse("a-- - b")), "((a--)-b)");
+    EXPECT_EQ(to_string(parse("p->q")), "(p->q)");
+    EXPECT_EQ(to_string(parse("a < -b")), "(a<(-b))");
+    EXPECT_THROW(parse("a < <b"), std::runtime_error);
+    EXPECT_THROW(parse("a = = b"), std::runtime_error);
+}
+
+TEST(Parser_test, Keywords_are_reserved_identifiers)
+{
+    EXPECT_THROW(parse("if"), std::runtime_error);
+    EXPECT_THROW(parse_stmt("int while = 1;"), std::runtime_error);
+    EXPECT_EQ(to_string(parse("iff + whiles")), "(iff+whiles)");
 }
 
 TEST(Parser_test, Parses_a_realistic_source_file_end_to_end)
 {
-    Parser parser{build_lexer(), std::filesystem::path{std::string{SOURCE_DIR} + "/libs/cpp/tests/data/example.cpp"}};
+    Parser parser{std::filesystem::path{std::string{SOURCE_DIR} + "/libs/clike/tests/data/example.c"}};
 
     const auto unit{parser.parse_translation_unit()};
 
@@ -1213,16 +1336,6 @@ TEST(Parser_test, Parses_a_realistic_source_file_end_to_end)
 
     EXPECT_TRUE(std::holds_alternative<ast::Function>(unit.items.back().node));
     EXPECT_EQ(std::get<ast::Function>(unit.items.back().node).name, "main");
-}
-
-TEST(Parser_test, Throws_on_out_of_range_numeric_literals)
-{
-    EXPECT_THROW(parse("99999999999999999999999999999"), std::runtime_error);
-    EXPECT_THROW(parse("0x10000000000000000"), std::runtime_error);
-    EXPECT_THROW(parse(std::string(400, '9') + ".5"), std::runtime_error);
-
-    // The largest representable values still convert.
-    EXPECT_EQ(to_string(parse("9223372036854775807")), "9223372036854775807");
 }
 
 TEST(Parser_test, Expression_spans_cover_their_source_extent)
@@ -1259,18 +1372,18 @@ TEST(Parser_test, Statement_spans_skip_leading_trivia)
 
 TEST(Parser_test, Item_spans_follow_source_order_across_lines)
 {
-    const auto unit{parse_unit("int a = 1;\r\nint b = 2;")};
+    const auto unit{parse_unit("int a = 1;\nint b = 2;")};
 
     ASSERT_EQ(unit.items.size(), 2U);
 
     EXPECT_EQ(unit.items.front().span.begin.offset, 0U);
     EXPECT_EQ(unit.items.front().span.end.offset, 10U);
 
-    // Offsets index the original bytes, so the second item starts after the two-byte "\r\n".
-    EXPECT_EQ(unit.items.back().span.begin.offset, 12U);
+    // Offsets index the original bytes, so the second item starts after the newline.
+    EXPECT_EQ(unit.items.back().span.begin.offset, 11U);
     EXPECT_EQ(unit.items.back().span.begin.line, 2U);
     EXPECT_EQ(unit.items.back().span.begin.column, 1U);
-    EXPECT_EQ(unit.items.back().span.end.offset, 22U);
+    EXPECT_EQ(unit.items.back().span.end.offset, 21U);
 }
 
 TEST(Parser_test, Block_spans_cover_their_braces)
@@ -1285,124 +1398,6 @@ TEST(Parser_test, Block_spans_cover_their_braces)
     EXPECT_EQ(compound.statements.front().span.begin.offset, 2U);
     EXPECT_EQ(compound.statements.back().span.end.offset, 7U);
 }
-
-namespace
-{
-/**
- * @brief Builds random expression ASTs from a fixed seed, for the print-and-reparse round trip.
- *
- * Every shape the renderer prints unambiguously is generated; spans are left empty, which the round trip ignores
- * because it compares printed forms.
- */
-class Expr_generator
-{
-public:
-    explicit Expr_generator(const unsigned seed) : seed_{seed} {}
-
-    ast::Expr expression(const int depth)
-    {
-        if (depth == 0 || next() % 4 == 0)
-        {
-            return leaf();
-        }
-
-        switch (next() % 8)
-        {
-        case 0:
-        {
-            constexpr ast::Binary_op ops[]{ast::Binary_op::Add,         ast::Binary_op::Subtract,
-                                           ast::Binary_op::Multiply,    ast::Binary_op::Less,
-                                           ast::Binary_op::Equal,       ast::Binary_op::Shift_left,
-                                           ast::Binary_op::Bitwise_and, ast::Binary_op::Logical_or};
-
-            return wrap(ast::Binary{
-                    .op = ops[next() % 8],
-                    .lhs = boxed(expression(depth - 1)),
-                    .rhs = boxed(expression(depth - 1))});
-        }
-        case 1:
-        {
-            constexpr ast::Unary_op ops[]{
-                    ast::Unary_op::Minus, ast::Unary_op::Not, ast::Unary_op::Bitwise_not, ast::Unary_op::Dereference,
-                    ast::Unary_op::Address_of};
-
-            return wrap(ast::Unary{.op = ops[next() % 5], .operand = boxed(expression(depth - 1))});
-        }
-        case 2:
-            return wrap(ast::Ternary{
-                    .condition = boxed(expression(depth - 1)),
-                    .then_branch = boxed(expression(depth - 1)),
-                    .else_branch = boxed(expression(depth - 1))});
-        case 3:
-        {
-            std::vector<ast::Expr> arguments;
-
-            for (auto count{next() % 3}; count > 0; --count)
-            {
-                arguments.push_back(expression(depth - 1));
-            }
-
-            return wrap(ast::Call{.callee = boxed(name()), .arguments = std::move(arguments)});
-        }
-        case 4:
-            return wrap(ast::Member{
-                    .op = next() % 2 == 0 ? ast::Member_op::Dot : ast::Member_op::Arrow,
-                    .object = boxed(expression(depth - 1)),
-                    .member = identifiers_[next() % 4]});
-        case 5:
-            return wrap(ast::Subscript{.object = boxed(expression(depth - 1)), .index = boxed(expression(depth - 1))});
-        case 6:
-        {
-            constexpr ast::Cast_kind kinds[]{
-                    ast::Cast_kind::Static, ast::Cast_kind::Dynamic, ast::Cast_kind::Const,
-                    ast::Cast_kind::Reinterpret};
-
-            constexpr ast::Type_kind types[]{ast::Type_kind::Char, ast::Type_kind::Int, ast::Type_kind::Double};
-
-            return wrap(ast::Cast{
-                    .kind = kinds[next() % 4],
-                    .type =
-                            {.type = {.is_const = next() % 2 == 0, .kind = types[next() % 3]},
-                             .pointers = next() % 3,
-                             .reference = next() % 2 == 0},
-                    .operand = boxed(expression(depth - 1))});
-        }
-        default:
-            return wrap(ast::Assign{
-                    .op = next() % 2 == 0 ? ast::Assign_op::Assign : ast::Assign_op::Add,
-                    .target = boxed(expression(depth - 1)),
-                    .value = boxed(expression(depth - 1))});
-        }
-    }
-
-private:
-    unsigned next() { return seed_ = seed_ * 1664525U + 1013904223U, seed_ >> 16U; }
-
-    static ast::Expr wrap(auto node) { return {.node = std::move(node)}; }
-
-    static std::unique_ptr<ast::Expr> boxed(ast::Expr expr) { return std::make_unique<ast::Expr>(std::move(expr)); }
-
-    ast::Expr name() { return wrap(ast::Name{.identifier = identifiers_[next() % 4]}); }
-
-    ast::Expr leaf()
-    {
-        switch (next() % 3)
-        {
-        case 0:
-            return wrap(ast::Int_literal{.value = static_cast<long long>(next() % 1000)});
-        case 1:
-            return wrap(ast::Bool_literal{.value = next() % 2 == 0});
-        default:
-            return name();
-        }
-    }
-
-    unsigned seed_;
-
-    const char* identifiers_[4]{"alpha", "beta", "gamma", "delta"};
-};
-
-} // namespace
 
 TEST(Parser_test, Generated_expressions_round_trip_through_print_and_reparse)
 {
@@ -1425,7 +1420,7 @@ TEST(Parser_test, Generated_expressions_round_trip_through_print_and_reparse)
 
 TEST(Parser_test, One_parser_serves_many_inputs)
 {
-    Parser parser{build_lexer(), std::string{"int a = 1;"}};
+    Parser parser{std::string{"int a = 1;"}};
 
     const auto first{parser.parse_translation_unit()};
 
@@ -1440,7 +1435,7 @@ TEST(Parser_test, One_parser_serves_many_inputs)
     // The first unit owns its strings, so replacing the input did not invalidate it.
     EXPECT_EQ(std::get<ast::Declaration>(first.items.front().node).declarators.front().name, "a");
 
-    EXPECT_EQ(to_string(parse("0X1f + 0B11")), "(31+3)");
+    EXPECT_EQ(to_string(parse("31 + 3")), "(31+3)");
 }
 
 TEST(Parser_test, Parses_each_named_cast)

@@ -1,15 +1,15 @@
-#ifndef HOPPER_LIBS_CPP_INCLUDE_HOPPER_CPP_AST_EXPR_HPP
-#define HOPPER_LIBS_CPP_INCLUDE_HOPPER_CPP_AST_EXPR_HPP
+#ifndef HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_EXPR_HPP
+#define HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_EXPR_HPP
 
 #include <memory>
 #include <string>
 #include <variant>
 #include <vector>
 
-#include "hopper/cpp/ast/type.hpp"
+#include "hopper/clike/ast/type.hpp"
 #include "hopper/parse/source_span.hpp"
 
-namespace hopper::cpp::ast
+namespace hopper::clike::ast
 {
 struct Expr;
 
@@ -94,15 +94,10 @@ enum class Assign_op
  */
 struct Int_literal
 {
+    /**
+     * @brief The literal's value.
+     */
     long long value;
-};
-
-/**
- * @brief A floating-point literal, e.g. `3.14`.
- */
-struct Float_literal
-{
-    double value;
 };
 
 /**
@@ -110,27 +105,22 @@ struct Float_literal
  */
 struct Bool_literal
 {
+    /**
+     * @brief The literal's value.
+     */
     bool value;
 };
 
 /**
- * @brief A string literal, e.g. `"hello\n"`.
+ * @brief A string literal, e.g. `"hello"`.
  *
- * Holds the characters between the quotes with escape sequences left exactly as written; decoding them is a
- * semantic concern.
+ * Holds the bytes between the quotes as written; the study grammar has no escapes, so a quote cannot appear inside.
  */
 struct String_literal
 {
-    std::string value;
-};
-
-/**
- * @brief A character literal, e.g. `'x'` or `'\n'`.
- *
- * Holds the character or escape between the quotes, undecoded, like String_literal.
- */
-struct Char_literal
-{
+    /**
+     * @brief The bytes between the quotes.
+     */
     std::string value;
 };
 
@@ -139,6 +129,9 @@ struct Char_literal
  */
 struct Name
 {
+    /**
+     * @brief The identifier as spelled.
+     */
     std::string identifier;
 };
 
@@ -147,7 +140,14 @@ struct Name
  */
 struct Unary
 {
+    /**
+     * @brief The operator applied.
+     */
     Unary_op op;
+
+    /**
+     * @brief The operand.
+     */
     std::unique_ptr<Expr> operand;
 };
 
@@ -156,7 +156,14 @@ struct Unary
  */
 struct Postfix
 {
+    /**
+     * @brief The operator applied.
+     */
     Postfix_op op;
+
+    /**
+     * @brief The operand.
+     */
     std::unique_ptr<Expr> operand;
 };
 
@@ -165,7 +172,14 @@ struct Postfix
  */
 struct Call
 {
+    /**
+     * @brief The expression called.
+     */
     std::unique_ptr<Expr> callee;
+
+    /**
+     * @brief The arguments, in source order.
+     */
     std::vector<Expr> arguments;
 };
 
@@ -174,8 +188,19 @@ struct Call
  */
 struct Member
 {
+    /**
+     * @brief Whether the access is `.` or `->`.
+     */
     Member_op op;
+
+    /**
+     * @brief The expression whose member is accessed.
+     */
     std::unique_ptr<Expr> object;
+
+    /**
+     * @brief The member's name.
+     */
     std::string member;
 };
 
@@ -184,7 +209,14 @@ struct Member
  */
 struct Subscript
 {
+    /**
+     * @brief The expression subscripted.
+     */
     std::unique_ptr<Expr> object;
+
+    /**
+     * @brief The index expression.
+     */
     std::unique_ptr<Expr> index;
 };
 
@@ -207,8 +239,19 @@ enum class Cast_kind
  */
 struct Cast
 {
+    /**
+     * @brief Which of the four named casts.
+     */
     Cast_kind kind;
+
+    /**
+     * @brief The type cast to.
+     */
     Type_id type;
+
+    /**
+     * @brief The expression cast.
+     */
     std::unique_ptr<Expr> operand;
 };
 
@@ -219,8 +262,19 @@ struct Cast
  */
 struct Binary
 {
+    /**
+     * @brief The operator applied.
+     */
     Binary_op op;
+
+    /**
+     * @brief The left operand.
+     */
     std::unique_ptr<Expr> lhs;
+
+    /**
+     * @brief The right operand.
+     */
     std::unique_ptr<Expr> rhs;
 };
 
@@ -231,8 +285,19 @@ struct Binary
  */
 struct Ternary
 {
+    /**
+     * @brief The condition.
+     */
     std::unique_ptr<Expr> condition;
+
+    /**
+     * @brief The value when the condition holds.
+     */
     std::unique_ptr<Expr> then_branch;
+
+    /**
+     * @brief The value when it does not.
+     */
     std::unique_ptr<Expr> else_branch;
 };
 
@@ -244,8 +309,19 @@ struct Ternary
  */
 struct Assign
 {
+    /**
+     * @brief The assignment performed.
+     */
     Assign_op op;
+
+    /**
+     * @brief The assigned-to expression.
+     */
     std::unique_ptr<Expr> target;
+
+    /**
+     * @brief The assigned value.
+     */
     std::unique_ptr<Expr> value;
 };
 
@@ -258,20 +334,25 @@ struct Expr
      * @brief The kinds of node an expression can be.
      */
     using Node_t = std::variant<
-            Int_literal, Float_literal, Bool_literal, String_literal, Char_literal, Name, Unary, Postfix, Call, Member,
-            Subscript, Binary, Ternary, Assign, Cast>;
+            Int_literal, Bool_literal, String_literal, Name, Unary, Postfix, Call, Member, Subscript, Binary, Ternary,
+            Assign, Cast>;
 
     /**
      * @brief The node this expression holds.
+     */
+    /**
+     * @brief The expression itself.
      */
     Node_t node;
 
     /**
      * @brief The source range this expression was parsed from, including any enclosing parentheses.
      */
+    /**
+     * @brief The source range the expression was parsed from.
+     */
     parse::Source_span span{};
 };
+} // namespace hopper::clike::ast
 
-} // namespace hopper::cpp::ast
-
-#endif // HOPPER_LIBS_CPP_INCLUDE_HOPPER_CPP_AST_EXPR_HPP
+#endif // HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_EXPR_HPP

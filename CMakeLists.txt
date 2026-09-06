@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.20)
-project(hopper)
+project(hopper VERSION 0.1.0 LANGUAGES CXX)
 
 if (NOT CMAKE_BUILD_TYPE)
     set(CMAKE_BUILD_TYPE Release)
@@ -48,11 +48,12 @@ add_library(${PROJECT_NAME}
 add_library(${PROJECT_NAME}::${PROJECT_NAME} ALIAS ${PROJECT_NAME})
 add_library(${PROJECT_NAME}::parse ALIAS hopper_parse)
 add_library(${PROJECT_NAME}::json ALIAS hopper_json)
-add_library(${PROJECT_NAME}::cpp ALIAS hopper_cpp)
+add_library(${PROJECT_NAME}::clike ALIAS hopper_clike)
 
 target_link_libraries(${PROJECT_NAME}
         INTERFACE
         hopper_parse
         hopper_json
-        hopper_cpp
+        hopper_clike
 )
+

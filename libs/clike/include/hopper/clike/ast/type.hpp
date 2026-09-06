@@ -1,9 +1,9 @@
-#ifndef HOPPER_LIBS_CPP_INCLUDE_HOPPER_CPP_AST_TYPE_HPP
-#define HOPPER_LIBS_CPP_INCLUDE_HOPPER_CPP_AST_TYPE_HPP
+#ifndef HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_TYPE_HPP
+#define HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_TYPE_HPP
 
 #include <cstddef>
 
-namespace hopper::cpp::ast
+namespace hopper::clike::ast
 {
 /**
  * @brief A fundamental type name.
@@ -25,7 +25,14 @@ enum class Type_kind
  */
 struct Type
 {
+    /**
+     * @brief Whether the type is const-qualified.
+     */
     bool is_const;
+
+    /**
+     * @brief The fundamental type.
+     */
     Type_kind kind;
 };
 
@@ -36,11 +43,21 @@ struct Type
  */
 struct Type_id
 {
+    /**
+     * @brief The qualified fundamental type.
+     */
     Type type;
+
+    /**
+     * @brief The pointer depth: one star per level.
+     */
     std::size_t pointers;
+
+    /**
+     * @brief Whether the type is a reference.
+     */
     bool reference;
 };
+} // namespace hopper::clike::ast
 
-} // namespace hopper::cpp::ast
-
-#endif // HOPPER_LIBS_CPP_INCLUDE_HOPPER_CPP_AST_TYPE_HPP
+#endif // HOPPER_LIBS_CLIKE_INCLUDE_HOPPER_CLIKE_AST_TYPE_HPP
