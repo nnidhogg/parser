@@ -5,6 +5,7 @@ project(hopper_json)
 include(GNUInstallDirs)
 
 add_library(${PROJECT_NAME}
+        src/document.cpp
         src/lexer.cpp
         src/parser.cpp
         src/value.cpp
@@ -31,6 +32,7 @@ if (HOPPER_BUILD_TESTS)
     add_executable(${PROJECT_NAME}_tests
             tests/parser_test.cpp
             tests/conformance_test.cpp
+            tests/document_test.cpp
     )
 
     target_link_libraries(${PROJECT_NAME}_tests

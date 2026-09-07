@@ -34,22 +34,29 @@ a parser may assume about its own state at that point is the open question the J
 
 - **A token reader over any munch lexer.** `parse::Token_reader<Kind>` wraps a `munch::core::Lexer` with one token of
   lookahead, a skip predicate for trivia, and locations that count `"\r\n"` and a lone `'\r'` as one newline each while
-  offsets index the original bytes. - **A parser base with the operations a recursive-descent parser repeats.**
-  `parse::Parser_base<Kind>` gives peek, check, accept and expect over token kinds, `mark()` and `span_from()` to close
-  a node's span, and three error raisers whose messages name what was expected. - **Structured errors.**
-  `parse::Parse_error` carries a kind, lexical, an unexpected token, an unexpected end, or an invalid literal, and the
-  source span it points at, with line, column and byte offset. - **Certified recovery.** `Parser_base::recover()` moves
-  the stream past a lexical error to the next token start munch certifies, under complete-repair invariance: in every
-  completely tokenizable repair of the text before the returned evidence, the answer begins a token. No repair is
-  promised to exist, the next read may error again, and a call with a token buffered throws rather than drop it. -
-  **JSON.** `json::Parser` parses one RFC 8259 text into a `json::Value` tree: null, booleans, numbers kept as spelled
+  offsets index the original bytes.
+- **A parser base with the operations a recursive-descent parser repeats.** `parse::Parser_base<Kind>` gives peek,
+  check, accept and expect over token kinds, `mark()` and `span_from()` to close a node's span, and three error raisers
+  whose messages name what was expected.
+- **Structured errors.** `parse::Parse_error` carries a kind, lexical, an unexpected token, an unexpected end, or an
+  invalid literal, and the source span it points at, with line, column and byte offset.
+- **Certified recovery.** `Parser_base::recover()` moves the stream past a lexical error to the next token start munch
+  certifies, under complete-repair invariance: in every completely tokenizable repair of the text before the returned
+  evidence, the answer begins a token. No repair is promised to exist, the next read may error again, and a call with a
+  token buffered throws rather than drop it.
+- **JSON.** `json::Parser` parses one RFC 8259 text into a `json::Value` tree: null, booleans, numbers kept as spelled
   with a conversion to double on request, strings unescaped to UTF-8 with surrogate pairs combined, arrays, and objects
   that keep members in document order with duplicates and answer a lookup with the last member of a name. The lexer's
   string interior is built from munch's UTF-8 code point ranges, so a string that is not well-formed UTF-8 never
-  tokenizes. - **The C-like study grammar.** `clike::Parser` parses expressions, statements and translation units over
-  the campaign's seven token kinds; its language is decimal integers, strings without escapes, booleans, the C operator
-  ladder with assignment and the ternary, calls, subscripts, member access, the four named casts, the fundamental types
-  with `const`, pointers and references, and `if`, `while`, `for`, `do`, `return`, blocks and declarations.
+  tokenizes.
+- **Edits that relex only what they reach.** `json::Document` keeps a text and its token stream and brings the stream
+  current after an edit by rescanning from the last certified token start before it to the first boundary after it that
+  the old stream shared, the edit theorem of the certified-splitting report as a type; every edit reports how many bytes
+  it reread.
+- **The C-like study grammar.** `clike::Parser` parses expressions, statements and translation units over the campaign's
+  seven token kinds; its language is decimal integers, strings without escapes, booleans, the C operator ladder with
+  assignment and the ternary, calls, subscripts, member access, the four named casts, the fundamental types with
+  `const`, pointers and references, and `if`, `while`, `for`, `do`, `return`, blocks and declarations.
 
 ## **Architecture Overview**
 
@@ -151,6 +158,28 @@ The base's `check(kind)`, `accept(kind)` and `expect(kind, what)` look at the ne
 token)`, `eof_error(message)` and `lexical_error(message)` raise the three error kinds with the right span. Both
 shipped grammars are written this way and are the reference for the style.
 
+### **Editing a JSON text**
+
+`json::Document` holds a text and its token stream, whitespace included, and keeps the stream current across edits by
+relexing between certified positions rather than from the start:
+
+```cpp
+#include <hopper/json/document.hpp>
+
+hopper::json::Document document{R"({"a": [1, 2, 3], "b": "text"})"};
+
+const auto relex{document.edit(10, 1, "22")};    // replace one byte at offset 10 with "22"
+
+// relex.rescanned is the bytes reread, a handful here; relex.whole is false unless the document had to start over.
+// document.tokens() now equals the stream of the edited text tokenized whole.
+```
+
+The scan restarts at the last certified token start whose evidence the edit left untouched, since munch's certificate
+promises a boundary there in every completely tokenizable text agreeing on that evidence, and stops at the first
+boundary after the edit that the old stream also had. An edit that leaves the text incompletely tokenizable relexes
+the whole text, and so does every edit through the one that repairs it. The saving on a real document is measured by
+`tools/probes/hopper_edit_relex` and quoted in [docs/design.md](docs/design.md).
+
 ### **Error Recovery**
 
 After a `Parse_error` of kind `Lexical`, the stream stands at the failing byte with nothing buffered, and
@@ -211,7 +240,8 @@ The JSON suite includes the 318 parsing cases of the JSONTestSuite, vendored und
 `libs/json/tests/data/JSONTestSuite/` with their licence and provenance: every `y_` case must parse, every `n_` case
 must be refused, and what the parser does on the `i_` cases is asserted rather than left to drift. Tests and
 warnings-as-errors are enabled by default only when hopper is the top-level project; a build consuming hopper through
-`add_subdirectory` opts in with `-DHOPPER_BUILD_TESTS=ON` or `-DHOPPER_WERROR=ON`.
+`add_subdirectory` opts in with `-DHOPPER_BUILD_TESTS=ON` or `-DHOPPER_WERROR=ON`. The probe under `tools/probes/`
+is a self-checking executable registered with CTest as well; given a JSON file it prints the edit figures instead.
 
 ## **Directory Structure**
 
@@ -220,10 +250,12 @@ docs/                     design.md, the decisions behind the kit and the two gr
 libs/
   parse/                  The kit: Token_reader, Token_lookahead, Token_location, Source_span, Parse_error,
                           Parser_base.
-  json/                   The JSON grammar: tokens over munch, the explicit-stack Parser, the Value tree; the
-                          conformance suite under tests/data.
+  json/                   The JSON grammar: tokens over munch, the explicit-stack Parser, the Value tree, the
+                          edit-relexing Document; the conformance suite under tests/data.
   clike/                  The C-like study grammar: the campaign's tokens, the Parser with its operator fusion, the
                           ast structs.
+tools/
+  probes/                 hopper_edit_relex, the edit theorem run as a program over a generated corpus or a file.
 external/
   munch/                  The lexer library, as a submodule pinned to a release.
   googletest/             The test framework.

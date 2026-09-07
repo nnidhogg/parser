@@ -61,6 +61,7 @@ endif ()
 
 add_subdirectory(external)
 add_subdirectory(libs)
+add_subdirectory(tools)
 
 # The umbrella carries hopper's own libraries; munch arrives transitively through hopper_parse.
 add_library(${PROJECT_NAME}
